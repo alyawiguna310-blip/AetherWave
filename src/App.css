@@ -58,14 +58,17 @@ nav { display:grid; gap:3px; }
 .sidebar-footer b { color: #9da3ad; font-weight: 500; }
 .sidebar-footer .ready { color: #70ba91; }
 
+.file-picker { display:none; }
 .content { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 27px 42px 28px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
 .content::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .page-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 20px; }
 .page-heading h1 { margin: 4px 0 0; font-size: 24px; font-weight: 600; letter-spacing: -.4px; color: #eceef1; }
-.settings, .clear-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 6px 10px; border: 1px solid #34383f; border-radius: 5px; background: #23262b; color: #9da3ad; font-size: 10px; }
-.settings svg, .clear-button svg { flex: 0 0 auto; }
-.settings:hover, .clear-button:hover { color: #e7e9ec; border-color: #484d55; }
-.settings:active, .clear-button:active { background: #2c3036; }
+.heading-actions { display:flex; align-items:center; gap:6px; }
+.import-button, .settings, .clear-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 6px 10px; border: 1px solid #34383f; border-radius: 5px; background: #23262b; color: #9da3ad; font-size: 10px; }
+.import-button svg, .settings svg, .clear-button svg { flex: 0 0 auto; }
+.import-button { border:1px solid #34383f; border-radius:5px; background:#23262b; color:#9da3ad; font-size:10px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:6px 10px; }
+.import-button:hover, .settings:hover, .clear-button:hover { color: #e7e9ec; border-color: #484d55; }
+.import-button:active, .settings:active, .clear-button:active { background: #2c3036; }
 
 .now-playing { min-height: 224px; display: flex; min-width: 0; background: #22252a; border: 1px solid #30343a; border-radius: 7px; overflow: hidden; }
 .cover { width: 224px; flex: 0 1 224px; min-width: 0; display: grid; place-items: center; position: relative; }
@@ -168,7 +171,9 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   .content { padding: 16px 12px 18px; }
   .page-heading { margin-bottom: 14px; }
   .page-heading h1 { font-size: 20px; }
-  .settings span { display: none; }
+  .heading-actions { gap:4px; }
+  .import-button span, .settings span { display: none; }
+  .import-button, .settings { width:31px; height:28px; padding:0; }
   .now-playing { min-height: 0; flex-direction: column; }
   .cover { width: 100%; height: 145px; flex: 0 0 145px; }
   .cover-inner { width: 100px; height: 100px; }
