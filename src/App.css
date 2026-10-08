@@ -171,3 +171,18 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   .volume input { width: 45px; flex-basis: 45px; }
   .volume > span:last-child { display: none; }
 }
+
+/* Subtle motion layer */
+@keyframes aw-fade-up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes aw-pulse { 0%,100% { transform:scale(1); opacity:.72; } 50% { transform:scale(1.08); opacity:1; } }
+@keyframes aw-spin { to { transform:rotate(360deg); } }
+
+.content > * { animation: aw-fade-up .38s ease both; }
+.track-row { transition: background-color .18s ease, transform .18s ease; }
+.track-row:hover { transform:translateX(3px); }
+.nav-link, .playlist-link, .small-button, .transport-buttons button, .play-button, .settings {
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease, transform .18s ease, opacity .18s ease;
+}
+.small-button:hover, .transport-buttons button:hover { transform:translateY(-1px); }
+.play-button:hover { transform:translateY(-1px); }
+.cover-inner { animation:aw-pulse 3.2s ease-in-out infinite; }
