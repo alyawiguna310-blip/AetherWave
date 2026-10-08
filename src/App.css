@@ -329,7 +329,7 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   margin: 0;
   padding: 16px;
   border: 0;
-  border-left: 1px solid #30343a;
+  border-left: 0;
   border-radius: 0;
   background: transparent;
 }
@@ -358,6 +358,6 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   }
   .now-playing-layout .visualizer-panel {
     border-left: 0;
-    border-top: 1px solid #30343a;
+    border-top: 0;
   }
 }
