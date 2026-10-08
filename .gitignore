@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+target/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# API credentials
+*.pem
+*.key
+credentials.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Coverage
+coverage/
+
+# Rust
+**/*.rs.bk
+
+# Local music / media
+music/
+media/
+*.mp3
+*.flac
+*.wav
+*.ogg
+*.m4a
+
+# Generated visualizer assets
+generated/
+cache/
