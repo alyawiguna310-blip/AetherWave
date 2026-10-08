@@ -300,25 +300,25 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
 .search-no-results span { font-size:10px; }
 @media (max-width:680px) { .search-topline h2 { font-size:22px; } .browse-grid { grid-template-columns:1fr; } .browse-card { min-height:90px; } .search-result-row { grid-template-columns:40px minmax(0,1fr) 28px; gap:9px; } .result-album { display:none; } .result-cover { width:40px; height:40px; } .search-workspace { padding:12px; } }
 
-/* Unified Now Playing + live spectrum surface */
-.now-playing { border-radius:7px 7px 0 0; background:linear-gradient(120deg,#22252a,#1b1e23); }
-.now-playing + .visualizer-panel { margin-top:0; padding:0 18px 14px; border:1px solid #30343a; border-top:0; border-radius:0 0 7px 7px; background:#1c1f24; }
-.now-playing + .visualizer-panel .panel-heading { margin:0; padding:12px 0 6px; }
-.spectrum-canvas { position:absolute; inset:18px 8px 27px; width:calc(100% - 16px); height:calc(100% - 45px); display:block; }
-
-
-/* Side-by-side Now Playing and spectrum layout */
+/* One unified Now Playing + spectrum card */
 .now-playing-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: stretch;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 0;
+  margin: 0 0 20px;
+  overflow: hidden;
+  border: 1px solid #30343a;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #22252a, #1b1e23 62%, #1c1f24);
 }
 .now-playing-layout .now-playing {
+  min-width: 0;
   min-height: 224px;
   height: 100%;
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .now-playing-layout .visualizer-panel {
   min-width: 0;
@@ -327,10 +327,11 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   flex-direction: column;
   justify-content: center;
   margin: 0;
-  padding: 14px;
-  border: 1px solid #30343a;
-  border-radius: 7px;
-  background: #1c1f24;
+  padding: 16px;
+  border: 0;
+  border-left: 1px solid #30343a;
+  border-radius: 0;
+  background: transparent;
 }
 .now-playing-layout .visualizer-panel .panel-heading {
   margin: 0 0 10px;
@@ -349,9 +350,14 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   inset: 12px 8px 27px;
   width: calc(100% - 16px);
   height: calc(100% - 39px);
+  display: block;
 }
 @media (max-width: 820px) {
   .now-playing-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .now-playing-layout .visualizer-panel {
+    border-left: 0;
+    border-top: 1px solid #30343a;
   }
 }
