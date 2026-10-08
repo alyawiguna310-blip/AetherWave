@@ -20,9 +20,9 @@ AetherWave aims to combine:
 
 ## Current Status
 
-AetherWave is currently in the early UI/prototype stage.
+**Phase 2 — UI foundation:** in progress. The Linux-inspired desktop shell, queue, player controls, and visualizer prototype are being refined before moving to real audio playback.
 
-The current build contains a fake music player, navigation, queue, visualizer prototype, and Linux-inspired desktop UI. Real music playback and audio-reactive visualization are being added step by step.
+The current build is still a frontend prototype with fake tracks. No real music streaming or local-file playback is wired in yet.
 
 ## Planned Architecture
 
@@ -110,43 +110,13 @@ Spotify and YouTube remain the property of their respective owners. AetherWave i
 
 ## Roadmap
 
-### Phase 1 — UI Prototype
-- [x] Initial desktop UI
-- [x] Linux-inspired design
-- [x] Fake player
-- [x] Queue UI
-- [x] Visualizer prototype
-
-### Phase 2 — Music Engine
-- [ ] Local MP3/FLAC playback
-- [ ] Play/pause
-- [ ] Seek
-- [ ] Volume
-- [ ] Queue system
-- [ ] Metadata
-
-### Phase 3 — Audio Visualizer
-- [ ] Web Audio API
-- [ ] Waveform visualization
-- [ ] Spectrum analyzer
-- [ ] Bass/frequency-reactive effects
-
-### Phase 4 — Animated Visuals
-- [ ] Particles
-- [ ] Reactive backgrounds
-- [ ] Album-art-based visuals
-- [ ] Shader effects
-
-### Phase 5 — Online Sources
-- [ ] Spotify integration
-- [ ] YouTube integration
-- [ ] Navidrome integration
-
-### Phase 6 — Platform Support
-- [ ] Windows packaging
-- [ ] Linux packaging
-- [ ] Performance optimization
-- [ ] Desktop integration
+- **Phase 1 — Project foundation** — complete
+- **Phase 2 — Linux-inspired UI** — in progress
+- **Phase 3 — Local music engine** — next
+- **Phase 4 — Web Audio visualizer** — planned
+- **Phase 5 — Reactive animated scenes** — planned
+- **Phase 6 — Spotify / YouTube / Navidrome integration** — planned
+- **Phase 7 — Windows + Linux packaging and polish** — planned
 
 ## License
 
