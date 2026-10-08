@@ -155,7 +155,7 @@ function App() {
     };
   }, []);
 
-  const formatTime  const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
+  const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
   const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
   const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
