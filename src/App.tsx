@@ -17,12 +17,22 @@ const navItems = [
   { name: "Visuals", icon: "visuals" },
 ] as const;
 
-function NavIcon({ name }: { name: string }) {
-  const common = { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  if (name === "home") return <svg {...common}><path d="M3 10.8 12 3l9 7.8" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>;
-  if (name === "search") return <svg {...common}><circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4.7 4.7" /></svg>;
-  if (name === "library") return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></svg>;
-  return <svg {...common}><path d="M4 14c1.7-5.3 3.4-5.3 5.1 0s3.4 5.3 5.1 0 3.4-5.3 5.1 0" /><path d="M4 9c1.7-3.1 3.4-3.1 5.1 0s3.4 3.1 5.1 0 3.4-3.1 5.1 0" /></svg>;
+function Icon({ name, size = 17 }: { name: string; size?: number }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (name === "home") return <svg {...p}><path d="M3 10.8 12 3l9 7.8" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>;
+  if (name === "search") return <svg {...p}><circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4.7 4.7" /></svg>;
+  if (name === "library") return <svg {...p}><path d="M5 4h14v16H5z" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></svg>;
+  if (name === "visuals") return <svg {...p}><path d="M4 14c1.7-5.3 3.4-5.3 5.1 0s3.4 5.3 5.1 0 3.4-5.3 5.1 0" /><path d="M4 9c1.7-3.1 3.4-3.1 5.1 0s3.4 3.1 5.1 0 3.4-3.1 5.1 0" /></svg>;
+  if (name === "plus") return <svg {...p}><path d="M12 5v14M5 12h14" /></svg>;
+  if (name === "music") return <svg {...p}><path d="M9 18V6l10-2v12" /><circle cx="6" cy="18" r="3" /><circle cx="16" cy="16" r="3" /></svg>;
+  if (name === "play") return <svg {...p} fill="currentColor" stroke="none"><path d="m8 5 11 7-11 7z" /></svg>;
+  if (name === "pause") return <svg {...p} fill="currentColor" stroke="none"><path d="M7 5h4v14H7zM13 5h4v14h-4z" /></svg>;
+  if (name === "prev") return <svg {...p}><path d="M6 5v14M18 6l-8 6 8 6z" /></svg>;
+  if (name === "next") return <svg {...p}><path d="M18 5v14M6 6l8 6-8 6z" /></svg>;
+  if (name === "volume") return <svg {...p}><path d="M4 10v4h4l5 4V6l-5 4z" /><path d="M16 9.5a4 4 0 0 1 0 5M18.5 7a7.5 7.5 0 0 1 0 10" /></svg>;
+  if (name === "settings") return <svg {...p}><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /><path d="m4.9 15.2-1.1 1.9 2.1 2.1 1.9-1.1M8.8 20.2l2.2.6.9-2.1M15.2 20.2l-2.2.6-.9-2.1M19.1 15.2l1.1 1.9-2.1 2.1-1.9-1.1M19.1 8.8l1.1-1.9-2.1-2.1-1.9 1.1M15.2 3.8l-2.2-.6-.9 2.1M8.8 3.8l-2.2-.6-.9 2.1M4.9 8.8 3.8 6.9l2.1-2.1 1.9 1.1" /></svg>;
+  if (name === "trash") return <svg {...p}><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>;
+  return <svg {...p}><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
 }
 
 function App() {
@@ -67,14 +77,14 @@ function App() {
           <nav>
             {navItems.map(({ name, icon }) => (
               <button key={name} className={active === name ? "nav-link active" : "nav-link"} onClick={() => setActive(name)}>
-                <span className="nav-icon"><NavIcon name={icon} /></span><span>{name}</span>
+                <span className="nav-icon"><Icon name={icon} /></span><span>{name}</span>
               </button>
             ))}
           </nav>
 
           <div className="nav-label library-label">PLAYLISTS</div>
-          <button className="playlist-link"><span className="playlist-icon">+</span><span>Create playlist</span></button>
-          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Liked tracks</span></button>
+          <button className="playlist-link"><span className="playlist-icon"><Icon name="plus" size={15} /></span><span>Create playlist</span></button>
+          <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Liked tracks</span></button>
           <button className="playlist-link"><span className="playlist-icon">♪</span><span>Chillwave</span></button>
           <button className="playlist-link"><span className="playlist-icon">♪</span><span>Late Night</span></button>
 
@@ -87,7 +97,7 @@ function App() {
         <main className="content">
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
-            <button className="settings" onClick={() => setMessage("Preferences are coming later")}>Preferences</button>
+            <button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button>
           </div>
 
           <section className="now-playing">
@@ -100,9 +110,9 @@ function App() {
               <p>{current.artist} <span>·</span> {current.album}</p>
               <div className="format-line"><span>FLAC</span><span>24 bit</span><span>44.1 kHz</span></div>
               <div className="action-row">
-                <button className="play-button" onClick={() => setPlaying(!playing)}>{playing ? "Pause" : "Play"}</button>
-                <button className="small-button" onClick={previous} aria-label="Previous track">‹‹</button>
-                <button className="small-button" onClick={next} aria-label="Next track">››</button>
+                <button className="play-button" onClick={() => setPlaying(!playing)}><><Icon name={playing ? "pause" : "play"} size={15} /><span>{playing ? "Pause" : "Play"}</span></></button>
+                <button className="small-button" onClick={previous} aria-label="Previous track"><Icon name="prev" /></button>
+                <button className="small-button" onClick={next} aria-label="Next track"><Icon name="next" /></button>
               </div>
             </div>
           </section>
@@ -110,7 +120,7 @@ function App() {
           <section className="visualizer-panel">
             <div className="panel-heading">
               <div><span className="kicker">VISUAL ENGINE</span><h3>Audio spectrum</h3></div>
-              <span className="status">● {playing ? "ACTIVE" : "IDLE"} · {message}</span>
+              <span className="status"><i />{playing ? "ACTIVE" : "IDLE"}<b />{message}</span>
             </div>
             <div className="spectrum">
               <div className="spectrum-bars">
@@ -129,7 +139,7 @@ function App() {
               <div className="table-head"><span>#</span><span>TRACK</span><span>ALBUM</span><span>TIME</span></div>
               {tracks.map((item, i) => (
                 <button key={item.title} className={i === track ? "track-row selected" : "track-row"} onClick={() => selectTrack(i)}>
-                  <span className="number">{i === track && playing ? "♫" : String(i + 1).padStart(2, "0")}</span>
+                  <span className="number">{i === track && playing ? <Icon name="music" size={14} /> : String(i + 1).padStart(2, "0")}</span>
                   <span className="track-main"><i style={{ background: item.accent }} /><b>{item.title}</b><small>{item.artist}</small></span>
                   <span className="album">{item.album}</span><span className="duration">{item.duration}</span>
                 </button>
@@ -142,10 +152,10 @@ function App() {
       <footer className="player">
         <div className="player-song"><div className="mini-cover" style={{ background: current.accent }}>A</div><div><b>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
-          <div className="transport-buttons"><button onClick={previous}>‹‹</button><button className="main-play" onClick={() => setPlaying(!playing)}>{playing ? "Ⅱ" : "▶"}</button><button onClick={next}>››</button></div>
+          <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => setPlaying(!playing)}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
           <div className="timeline"><span>1:32</span><input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} /><span>{current.duration}</span></div>
         </div>
-        <div className="volume"><span>VOL</span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
+        <div className="volume"><span className="volume-icon"><Icon name="volume" size={16} /></span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
       </footer>
     </div>
   );
