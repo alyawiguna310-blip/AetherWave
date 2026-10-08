@@ -10,9 +10,7 @@ const tracks: Track[] = [
   { title: "Nightcall", artist: "Kavinsky", album: "OutRun", duration: "4:18", accent: "#c77a93" },
 ];
 
-const navItems = [
-  ["Home", "⌂"], ["Search", "⌕"], ["Library", "▤"], ["Visuals", "◌"],
-] as const;
+const navItems = [["Home", "⌂"], ["Search", "⌕"], ["Library", "▤"], ["Visuals", "◌"]] as const;
 
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
@@ -28,12 +26,11 @@ function App() {
     return () => window.clearInterval(timer);
   }, [playing]);
 
-  const bars = useMemo(() => Array.from({ length: 56 }, (_, i) =>
-    10 + Math.abs(Math.sin(i * 0.43) * 32 + Math.sin(i * 0.16) * 14)
+  const bars = useMemo(() => Array.from({ length: 64 }, (_, i) =>
+    8 + Math.abs(Math.sin(i * 0.43) * 32 + Math.sin(i * 0.16) * 14)
   ), []);
 
-  const selectTrack = (index: number) => { setTrack(index); setProgress(0); };
-
+  const selectTrack = (index: number) => { setTrack(index); setProgress(0); setPlaying(true); };
   const next = () => selectTrack((track + 1) % tracks.length);
   const previous = () => selectTrack((track - 1 + tracks.length) % tracks.length);
 
@@ -42,9 +39,7 @@ function App() {
       <header className="titlebar">
         <div className="app-name"><span className="app-symbol">A</span><span>AetherWave</span></div>
         <div className="titlebar-center">{active}</div>
-        <div className="window-actions" aria-label="Window controls">
-          <span>−</span><span>□</span><span>×</span>
-        </div>
+        <div className="window-actions" aria-label="Window controls"><span>−</span><span>□</span><span>×</span></div>
       </header>
 
       <div className="layout">
@@ -77,19 +72,13 @@ function App() {
 
         <main className="content">
           <div className="page-heading">
-            <div>
-              <span className="kicker">MUSIC PLAYER</span>
-              <h1>{active === "Home" ? "Home" : active}</h1>
-            </div>
+            <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
             <button className="settings">Preferences</button>
           </div>
 
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
-              <div className="cover-inner">
-                <span className="cover-name">AETHER</span>
-                <span className="cover-title">WAVE</span>
-              </div>
+              <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>
             </div>
             <div className="now-info">
               <span className="kicker">NOW PLAYING</span>
@@ -129,8 +118,7 @@ function App() {
                 <button key={item.title} className={i === track ? "track-row selected" : "track-row"} onClick={() => selectTrack(i)}>
                   <span className="number">{i === track && playing ? "♫" : String(i + 1).padStart(2, "0")}</span>
                   <span className="track-main"><i style={{ background: item.accent }} /><b>{item.title}</b><small>{item.artist}</small></span>
-                  <span className="album">{item.album}</span>
-                  <span className="duration">{item.duration}</span>
+                  <span className="album">{item.album}</span><span className="duration">{item.duration}</span>
                 </button>
               ))}
             </div>
@@ -139,16 +127,9 @@ function App() {
       </div>
 
       <footer className="player">
-        <div className="player-song">
-          <div className="mini-cover" style={{ background: current.accent }}>A</div>
-          <div><b>{current.title}</b><small>{current.artist}</small></div>
-        </div>
+        <div className="player-song"><div className="mini-cover" style={{ background: current.accent }}>A</div><div><b>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
-          <div className="transport-buttons">
-            <button onClick={previous}>‹‹</button>
-            <button className="main-play" onClick={() => setPlaying(!playing)}>{playing ? "Ⅱ" : "▶"}</button>
-            <button onClick={next}>››</button>
-          </div>
+          <div className="transport-buttons"><button onClick={previous}>‹‹</button><button className="main-play" onClick={() => setPlaying(!playing)}>{playing ? "Ⅱ" : "▶"}</button><button onClick={next}>››</button></div>
           <div className="timeline"><span>1:32</span><input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} /><span>{current.duration}</span></div>
         </div>
         <div className="volume"><span>VOL</span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
