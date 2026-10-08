@@ -10,7 +10,20 @@ const tracks: Track[] = [
   { title: "Nightcall", artist: "Kavinsky", album: "OutRun", duration: "4:18", accent: "#c77a93" },
 ];
 
-const navItems = [["Home", "⌂"], ["Search", "⌕"], ["Library", "▤"], ["Visuals", "◌"]] as const;
+const navItems = [
+  { name: "Home", icon: "home" },
+  { name: "Search", icon: "search" },
+  { name: "Library", icon: "library" },
+  { name: "Visuals", icon: "visuals" },
+] as const;
+
+function NavIcon({ name }: { name: string }) {
+  const common = { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (name === "home") return <svg {...common}><path d="M3 10.8 12 3l9 7.8" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>;
+  if (name === "search") return <svg {...common}><circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4.7 4.7" /></svg>;
+  if (name === "library") return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></svg>;
+  return <svg {...common}><path d="M4 14c1.7-5.3 3.4-5.3 5.1 0s3.4 5.3 5.1 0 3.4-5.3 5.1 0" /><path d="M4 9c1.7-3.1 3.4-3.1 5.1 0s3.4 3.1 5.1 0 3.4-3.1 5.1 0" /></svg>;
+}
 
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
@@ -52,18 +65,18 @@ function App() {
 
           <div className="nav-label">NAVIGATION</div>
           <nav>
-            {navItems.map(([name, icon]) => (
+            {navItems.map(({ name, icon }) => (
               <button key={name} className={active === name ? "nav-link active" : "nav-link"} onClick={() => setActive(name)}>
-                <span className="nav-icon">{icon}</span>{name}
+                <span className="nav-icon"><NavIcon name={icon} /></span><span>{name}</span>
               </button>
             ))}
           </nav>
 
           <div className="nav-label library-label">PLAYLISTS</div>
-          <button className="playlist-link">＋ Create playlist</button>
-          <button className="playlist-link">♡ Liked tracks</button>
-          <button className="playlist-link">Chillwave</button>
-          <button className="playlist-link">Late Night</button>
+          <button className="playlist-link"><span className="playlist-icon">+</span><span>Create playlist</span></button>
+          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Liked tracks</span></button>
+          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Chillwave</span></button>
+          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Late Night</span></button>
 
           <div className="sidebar-footer">
             <div><span>Library</span><b>128 tracks</b></div>
