@@ -68,9 +68,77 @@ function App() {
     return () => window.clearInterval(timer);
   }, [playing]);
 
-  const bars = useMemo(() => Array.from({ length: 64 }, (_, i) =>
-    8 + Math.abs(Math.sin(i * 0.43) * 32 + Math.sin(i * 0.16) * 14)
-  ), []);
+  const spectrumCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    const canvas = spectrumCanvasRef.current;
+    if (!audio || !canvas) return;
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const context = new AudioContextClass();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 128;
+    analyser.smoothingTimeConstant = 0.82;
+    const source = context.createMediaElementSource(audio);
+    source.connect(analyser);
+    analyser.connect(context.destination);
+    audioContextRef.current = context;
+    analyserRef.current = analyser;
+    sourceRef.current = source;
+
+    const draw = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.floor(rect.width * dpr));
+      const height = Math.max(1, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, width, height);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const count = 64;
+        const gap = Math.max(2 * dpr, width * 0.004);
+        const barWidth = (width - gap * (count - 1)) / count;
+        for (let i = 0; i < count; i++) {
+          const bin = data[Math.floor(i * data.length / count)] / 255;
+          const idle = 0.035 + Math.abs(Math.sin(i * 0.43) * 0.07 + Math.sin(i * 0.16) * 0.04);
+          const level = playing && current.url ? bin : idle;
+          const barHeight = Math.max(3 * dpr, level * height * 0.88);
+          const x = i * (barWidth + gap);
+          const y = (height - barHeight) / 2;
+          const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+          gradient.addColorStop(0, current.accent);
+          gradient.addColorStop(1, current.accent + "55");
+          ctx.fillStyle = gradient;
+          ctx.globalAlpha = playing && current.url ? 0.95 : 0.52;
+          ctx.beginPath();
+          ctx.roundRect(x, y, barWidth, barHeight, Math.min(3 * dpr, barWidth / 2));
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      frame = window.requestAnimationFrame(draw);
+    };
+    let frame = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      source.disconnect();
+      analyser.disconnect();
+      void context.close();
+      sourceRef.current = null;
+      analyserRef.current = null;
+      audioContextRef.current = null;
+    };
+  }, [current.accent, current.url, playing]);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
