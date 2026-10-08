@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
-type Track = { title: string; artist: string; album: string; duration: string; accent: string };
+type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
 
 const tracks: Track[] = [
   { title: "Midnight City", artist: "M83", album: "Hurry Up, We're Dreaming", duration: "4:03", accent: "#8b7cff" },
@@ -39,10 +39,16 @@ function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
   const [track, setTrack] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(38);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [localTracks, setLocalTracks] = useState<Track[]>([]);
+  const [localFiles, setLocalFiles] = useState<File[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
-  const current = tracks[track];
+  const availableTracks = localTracks.length ? localTracks : tracks;
+  const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
   useEffect(() => {
     if (!playing) return;
@@ -97,10 +103,10 @@ function App() {
           </div>
         </aside>
 
-        <main className="content">
+        <main className="content">\n          <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
-            <button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button>
+            <div className="heading-actions"><button className="import-button" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={14} /><span>Import music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
           </div>
 
           <section className="now-playing">
@@ -111,7 +117,7 @@ function App() {
               <span className="kicker">NOW PLAYING</span>
               <h2>{current.title}</h2>
               <p>{current.artist} <span>·</span> {current.album}</p>
-              <div className="format-line"><span>FLAC</span><span>24 bit</span><span>44.1 kHz</span></div>
+              <div className="format-line"><span>{current.url ? "LOCAL" : "DEMO"}</span><span>{current.url ? "FILE" : "24 bit"}</span><span>{current.url ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : "44.1 kHz"}</span></div>
               <div className="action-row">
                 <button className="play-button" onClick={() => setPlaying(!playing)}><><Icon name={playing ? "pause" : "play"} size={15} /><span>{playing ? "Pause" : "Play"}</span></></button>
                 <button className="small-button" onClick={previous} aria-label="Previous track"><Icon name="prev" /></button>
@@ -140,7 +146,7 @@ function App() {
             </div>
             <div className="track-table">
               <div className="table-head"><span>#</span><span>TRACK</span><span>ALBUM</span><span>TIME</span></div>
-              {tracks.map((item, i) => (
+              {availableTracks.map((item, i) => (
                 <button key={item.title} className={i === track ? "track-row selected" : "track-row"} onClick={() => selectTrack(i)}>
                   <span className="number">{i === track && playing ? <Icon name="music" size={14} /> : String(i + 1).padStart(2, "0")}</span>
                   <span className="track-main"><i style={{ background: item.accent }} /><b>{item.title}</b><small>{item.artist}</small></span>
@@ -152,11 +158,11 @@ function App() {
         </main>
       </div>
 
-      <footer className="player">
+      <footer className="player">\n        <audio ref={audioRef} preload="metadata" onLoadedMetadata={(e) => { const duration = e.currentTarget.duration; setLocalTracks((items) => items.map((item, i) => i === track ? { ...item, duration: formatTime(duration) } : item)); }} onTimeUpdate={(e) => { const time = e.currentTarget.currentTime; const duration = e.currentTarget.duration; setCurrentTime(time); setProgress(duration ? (time / duration) * 100 : 0); }} onEnded={next} />
         <div className="player-song"><div className="mini-cover" style={{ background: current.accent }}>A</div><div><b>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
           <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => setPlaying(!playing)}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
-          <div className="timeline"><span>1:32</span><input type="range" min="0" max="100" value={progress} onChange={(e) => setProgress(Number(e.target.value))} /><span>{current.duration}</span></div>
+          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{current.duration}</span></div>
         </div>
         <div className="volume"><span className="volume-icon"><Icon name="volume" size={16} /></span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
       </footer>
