@@ -42,7 +42,6 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [localTracks, setLocalTracks] = useState<Track[]>([]);
-  const [localFiles, setLocalFiles] = useState<File[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [volume, setVolume] = useState(72);
