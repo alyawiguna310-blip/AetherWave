@@ -10,12 +10,6 @@ const tracks: Track[] = [
   { title: "Nightcall", artist: "Kavinsky", album: "OutRun", duration: "4:18", accent: "#c77a93" },
 ];
 
-const librarySources = [
-  { name: "Spotify", icon: "spotify" },
-  { name: "YouTube Music", icon: "youtube" },
-  { name: "Local", icon: "folder" },
-] as const;
-
 const navItems = [
   { name: "Home", icon: "home" },
   { name: "Search", icon: "search" },
@@ -47,7 +41,8 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
 
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
-  const [librarySource, setLibrarySource] = useState<(typeof librarySources)[number]["name"]>("Local");
+  const [searchProvider, setSearchProvider] = useState<"YouTube" | "Spotify">("YouTube");
+  const [searchQuery, setSearchQuery] = useState("");
   const [track, setTrack] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -57,7 +52,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
-  const availableTracks = librarySource === "Local" ? localTracks : tracks;
+  const availableTracks = localTracks;
   const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
   useEffect(() => {
@@ -80,9 +75,9 @@ function App() {
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
   const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
-  const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setLibrarySource("Local"); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
-  const next = () => selectTrack((track + 1) % tracks.length);
-  const previous = () => selectTrack((track - 1 + tracks.length) % tracks.length);
+  const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
+  const next = () => { if (availableTracks.length) selectTrack((track + 1) % availableTracks.length); };
+  const previous = () => { if (availableTracks.length) selectTrack((track - 1 + availableTracks.length) % availableTracks.length); };
 
   return (
     <div className="app" style={{ "--accent": current.accent } as React.CSSProperties}>
@@ -130,8 +125,8 @@ function App() {
             <div className="heading-actions"><button className="download-button" onClick={() => fileInputRef.current?.click()}><Icon name="download" size={14} /><span>Download Music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
           </div>
 
-          {active === "Library" && <section className="library-sources">{librarySources.map(({ name, icon }) => <button key={name} className={librarySource === name ? "source-tab active" : "source-tab"} onClick={() => { setLibrarySource(name); setTrack(0); setPlaying(false); setProgress(0); setMessage(name === "Local" ? "Downloaded Music" : `${name} sync coming soon`); }}><Icon name={icon} size={15} /><span>{name}</span></button>)}</section>}
-          {active === "Library" && librarySource === "Local" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">LOCAL LIBRARY</span><h3>Download Music</h3><p>Downloaded music will appear here.</p></div></section>}
+          {active === "Search" && <section className="search-workspace"><div className="provider-switch" data-provider={searchProvider} role="group" aria-label="Search provider"><span className="provider-slider" aria-hidden="true" /><button className={searchProvider === "YouTube" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("YouTube")} aria-pressed={searchProvider === "YouTube"}><Icon name="youtube" size={16} /><span>YouTube</span></button><button className={searchProvider === "Spotify" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("Spotify")} aria-pressed={searchProvider === "Spotify"}><Icon name="spotify" size={16} /><span>Spotify</span></button></div><label className="search-field"><Icon name="search" size={18} /><input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setMessage(`${searchProvider} search is not connected yet`); }} placeholder={`Search ${searchProvider} tracks, artists, or albums...`} /><kbd>ENTER</kbd></label><p className="search-note">{searchQuery.trim() ? `${searchProvider} search integration is coming soon — your query is ready.` : `Choose ${searchProvider} and search for music. Provider connection is coming soon.`}</p></section>}
+          {active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
 
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
@@ -177,6 +172,7 @@ function App() {
                   <span className="album">{item.album}</span><span className="duration">{item.duration}</span>
                 </button>
               ))}
+              {!availableTracks.length && <div className="empty-table">No offline tracks yet — use Download Music to add audio files.</div>}
             </div>
           </section>
         </main>
