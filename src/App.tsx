@@ -111,7 +111,7 @@ function App() {
         for (let i = 0; i < count; i++) {
           const bin = data[Math.floor(i * data.length / count)] / 255;
           const idle = 0.035 + Math.abs(Math.sin(i * 0.43) * 0.07 + Math.sin(i * 0.16) * 0.04);
-          const level = playing && current.url ? bin : idle;
+          const isActive = !audio.paused && Boolean(audio.currentSrc);\n          const level = isActive ? bin : idle;
           const barHeight = Math.max(3 * dpr, level * height * 0.88);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
@@ -119,7 +119,7 @@ function App() {
           gradient.addColorStop(0, current.accent);
           gradient.addColorStop(1, current.accent + "55");
           ctx.fillStyle = gradient;
-          ctx.globalAlpha = playing && current.url ? 0.95 : 0.52;
+          ctx.globalAlpha = !audio.paused && Boolean(audio.currentSrc) ? 0.95 : 0.52;
           ctx.beginPath();
           ctx.roundRect(x, y, barWidth, barHeight, Math.min(3 * dpr, barWidth / 2));
           ctx.fill();
@@ -138,7 +138,7 @@ function App() {
       analyserRef.current = null;
       audioContextRef.current = null;
     };
-  }, [current.accent, current.url, playing]);
+  }, []);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
