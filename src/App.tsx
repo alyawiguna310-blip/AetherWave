@@ -91,16 +91,23 @@ function App() {
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
 
-    const context = new AudioContextClass();
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 128;
-    analyser.smoothingTimeConstant = 0.82;
-    const source = context.createMediaElementSource(audio);
-    source.connect(analyser);
-    analyser.connect(context.destination);
-    audioContextRef.current = context;
-    analyserRef.current = analyser;
-    sourceRef.current = source;
+    // React StrictMode re-runs effects in development. Reuse the existing
+    // MediaElementAudioSourceNode because an audio element can only have one.
+    let context = audioContextRef.current;
+    let analyser = analyserRef.current;
+    let source = sourceRef.current;
+    if (!context || !analyser || !source) {
+      context = new AudioContextClass();
+      analyser = context.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.82;
+      source = context.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(context.destination);
+      audioContextRef.current = context;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
+    }
 
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
@@ -132,7 +139,7 @@ function App() {
           gradient.addColorStop(0, accent);
           gradient.addColorStop(1, accent + "55");
           ctx.fillStyle = gradient;
-          ctx.globalAlpha = !audio.paused && Boolean(audio.currentSrc) ? 0.95 : 0.52;
+          ctx.globalAlpha = isActive ? 0.95 : 0.52;
           ctx.beginPath();
           ctx.roundRect(x, y, barWidth, barHeight, Math.min(3 * dpr, barWidth / 2));
           ctx.fill();
@@ -144,16 +151,11 @@ function App() {
     let frame = window.requestAnimationFrame(draw);
     return () => {
       window.cancelAnimationFrame(frame);
-      source.disconnect();
-      analyser.disconnect();
-      void context.close();
-      sourceRef.current = null;
-      analyserRef.current = null;
-      audioContextRef.current = null;
+      // Keep the single audio graph alive across StrictMode effect replays.
     };
   }, []);
 
-  const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
+  const formatTime  const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
   const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
   const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
