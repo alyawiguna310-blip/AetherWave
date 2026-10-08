@@ -122,7 +122,8 @@ function App() {
         for (let i = 0; i < count; i++) {
           const bin = data[Math.floor(i * data.length / count)] / 255;
           const idle = 0.035 + Math.abs(Math.sin(i * 0.43) * 0.07 + Math.sin(i * 0.16) * 0.04);
-          const isActive = !audio.paused && Boolean(audio.currentSrc);\n          const level = isActive ? bin : idle;
+          const isActive = !audio.paused && Boolean(audio.currentSrc);
+          const level = isActive ? bin : idle;
           const barHeight = Math.max(3 * dpr, level * height * 0.88);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
