@@ -18,6 +18,7 @@ function App() {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(38);
   const [volume, setVolume] = useState(72);
+  const [message, setMessage] = useState("Ready");
   const current = tracks[track];
 
   useEffect(() => {
@@ -30,7 +31,7 @@ function App() {
     8 + Math.abs(Math.sin(i * 0.43) * 32 + Math.sin(i * 0.16) * 14)
   ), []);
 
-  const selectTrack = (index: number) => { setTrack(index); setProgress(0); setPlaying(true); };
+  const selectTrack = (index: number) => { setTrack(index); setProgress(0); setPlaying(true); setMessage(`Playing ${tracks[index].title}`); };
   const next = () => selectTrack((track + 1) % tracks.length);
   const previous = () => selectTrack((track - 1 + tracks.length) % tracks.length);
 
@@ -39,7 +40,7 @@ function App() {
       <header className="titlebar">
         <div className="app-name"><span className="app-symbol">A</span><span>AetherWave</span></div>
         <div className="titlebar-center">{active}</div>
-        <div className="window-actions" aria-label="Window controls"><span>−</span><span>□</span><span>×</span></div>
+        <div className="window-actions" aria-hidden="true"><span>•</span><span>•</span><span>•</span></div>
       </header>
 
       <div className="layout">
@@ -73,7 +74,7 @@ function App() {
         <main className="content">
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
-            <button className="settings">Preferences</button>
+            <button className="settings" onClick={() => setMessage("Preferences are coming later")}>Preferences</button>
           </div>
 
           <section className="now-playing">
@@ -96,10 +97,9 @@ function App() {
           <section className="visualizer-panel">
             <div className="panel-heading">
               <div><span className="kicker">VISUAL ENGINE</span><h3>Audio spectrum</h3></div>
-              <span className="status">● {playing ? "ACTIVE" : "IDLE"}</span>
+              <span className="status">● {playing ? "ACTIVE" : "IDLE"} · {message}</span>
             </div>
             <div className="spectrum">
-              <div className="spectrum-grid" />
               <div className="spectrum-bars">
                 {bars.map((height, i) => <i key={i} style={{ height: `${playing ? height : Math.max(5, height * .32)}px`, animationDelay: `${i * -0.045}s` }} />)}
               </div>
@@ -110,7 +110,7 @@ function App() {
           <section className="queue">
             <div className="panel-heading">
               <div><span className="kicker">PLAYBACK QUEUE</span><h3>Up next</h3></div>
-              <button className="clear-button">Clear</button>
+              <button className="clear-button" onClick={() => setMessage("Queue cleared — demo mode")}>Clear</button>
             </div>
             <div className="track-table">
               <div className="table-head"><span>#</span><span>TRACK</span><span>ALBUM</span><span>TIME</span></div>
