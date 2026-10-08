@@ -7,6 +7,7 @@
   -webkit-font-smoothing: antialiased;
 }
 * { box-sizing: border-box; }
+html, body, #root { width: 100%; min-height: 100%; }
 body { margin: 0; min-width: 980px; min-height: 100vh; background: #17191d; }
 button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
@@ -52,7 +53,11 @@ nav { display: grid; gap: 2px; }
 .sidebar-footer b { color: #9da3ad; font-weight: 500; }
 .sidebar-footer .ready { color: #70ba91; }
 
-.content { flex: 1; min-width: 0; padding: 27px 42px 98px; overflow: auto; }
+.content {
+  flex: 1; min-width: 0; padding: 27px 42px 98px;
+  overflow: auto; scrollbar-width: none;
+}
+.content::-webkit-scrollbar { display: none; }
 .page-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 20px; }
 .page-heading h1 { margin: 4px 0 0; font-size: 24px; font-weight: 600; letter-spacing: -.4px; color: #eceef1; }
 .settings, .clear-button {
@@ -75,9 +80,7 @@ nav { display: grid; gap: 2px; }
 .format-line { display: flex; gap: 7px; margin: 17px 0; }
 .format-line span { padding: 3px 6px; border: 1px solid #3a3f47; border-radius: 3px; color: #7f8791; font: 8px ui-monospace, monospace; }
 .action-row { display: flex; gap: 6px; }
-.play-button, .small-button {
-  height: 31px; border-radius: 5px; font-size: 11px; font-weight: 600;
-}
+.play-button, .small-button { height: 31px; border-radius: 5px; font-size: 11px; font-weight: 600; }
 .play-button { padding: 0 17px; background: #e1e4e8; color: #17191d; }
 .play-button:hover { background: #fff; }
 .small-button { width: 35px; background: #30343b; color: #b8bdc6; }
@@ -88,27 +91,29 @@ nav { display: grid; gap: 2px; }
 .panel-heading h3 { margin: 3px 0 0; color: #dfe2e6; font-size: 14px; font-weight: 600; }
 .status { padding-bottom: 2px; color: #6fae89; font: 9px ui-monospace, monospace; }
 .spectrum {
-  height: 170px; position: relative; overflow: hidden; border: 1px solid #30343a;
-  border-radius: 6px; background: #17191d;
+  height: 170px; position: relative; overflow: hidden;
+  border-top: 1px solid #30343a; border-bottom: 1px solid #30343a;
+  background: #17191d;
 }
 .spectrum-grid {
-  position: absolute; inset: 0; opacity: .45;
+  position: absolute; inset: 0; opacity: .4;
   background-image: linear-gradient(#ffffff08 1px, transparent 1px), linear-gradient(90deg, #ffffff08 1px, transparent 1px);
   background-size: 36px 34px;
 }
-.spectrum-bars { position: absolute; left: 22px; right: 22px; top: 28px; bottom: 28px; display: flex; align-items: center; gap: 5px; }
+.spectrum-bars { position: absolute; left: 8px; right: 8px; top: 28px; bottom: 28px; display: flex; align-items: center; gap: 5px; }
 .spectrum-bars i {
   flex: 1; min-width: 2px; max-width: 9px; margin: 0 auto; border-radius: 1px 1px 0 0;
   background: var(--accent); opacity: .7; animation: spectrum 1s ease-in-out infinite alternate;
 }
-.spectrum-label { position: absolute; bottom: 9px; left: 12px; color: #5f6670; font: 8px ui-monospace, monospace; }
+.spectrum-label { position: absolute; bottom: 9px; left: 0; color: #5f6670; font: 8px ui-monospace, monospace; }
 @keyframes spectrum { from { transform: scaleY(.7); } to { transform: scaleY(1); } }
 
-.track-table { overflow: hidden; border: 1px solid #30343a; border-radius: 6px; background: #202328; }
+.queue { padding-bottom: 8px; }
+.track-table { overflow: hidden; border-top: 1px solid #30343a; background: #202328; }
 .table-head, .track-row { display: grid; grid-template-columns: 42px minmax(230px, 1.7fr) minmax(160px, 1fr) 58px; gap: 12px; align-items: center; }
 .table-head { padding: 8px 12px; border-bottom: 1px solid #30343a; color: #686f79; font: 8px ui-monospace, monospace; letter-spacing: .6px; }
 .track-row { width: 100%; padding: 8px 12px; border-bottom: 1px solid #2b2f35; background: transparent; color: #aeb4bd; text-align: left; }
-.track-row:last-child { border-bottom: 0; }
+.track-row:last-child { border-bottom: 1px solid #30343a; }
 .track-row:hover { background: #292d32; }
 .track-row.selected { background: #2b2f35; color: #f0f1f3; }
 .number { color: #6c737d; font: 10px ui-monospace, monospace; text-align: center; }
@@ -138,8 +143,8 @@ nav { display: grid; gap: 2px; }
 .timeline input { flex: 1; }
 .volume { display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: #666d77; font: 8px ui-monospace, monospace; }
 .volume input { width: 90px; }
-
 input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer; }
+
 @media (max-width: 1100px) {
   .sidebar { width: 195px; flex-basis: 195px; }
   .content { padding-left: 28px; padding-right: 28px; }
