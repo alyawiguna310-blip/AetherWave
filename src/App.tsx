@@ -75,6 +75,17 @@ function App() {
 
   useEffect(() => {
     const audio = audioRef.current;
+    if (!audio) return;
+    if (playing && current.url) {
+      void audioContextRef.current?.resume();
+      void audio.play().catch(() => setMessage("Could not play this local audio file"));
+    } else {
+      audio.pause();
+    }
+  }, [playing, current.url]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
     const canvas = spectrumCanvasRef.current;
     if (!audio || !canvas) return;
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -116,8 +127,9 @@ function App() {
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
           const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-          gradient.addColorStop(0, current.accent);
-          gradient.addColorStop(1, current.accent + "55");
+          const accent = getComputedStyle(document.querySelector(".app") ?? canvas).getPropertyValue("--accent").trim() || "#8b7cff";
+          gradient.addColorStop(0, accent);
+          gradient.addColorStop(1, accent + "55");
           ctx.fillStyle = gradient;
           ctx.globalAlpha = !audio.paused && Boolean(audio.currentSrc) ? 0.95 : 0.52;
           ctx.beginPath();
@@ -232,9 +244,8 @@ function App() {
               <span className="status"><i />{playing ? "ACTIVE" : "IDLE"}<b />{message}</span>
             </div>
             <div className="spectrum">
-              <div className="spectrum-bars">
-                {bars.map((height, i) => <i key={i} style={{ height: `${playing ? height : Math.max(5, height * .32)}px`, animationDelay: `${i * -0.045}s` }} />)}
-              </div>
+              <canvas ref={spectrumCanvasRef} className="spectrum-canvas" aria-label="Audio frequency spectrum visualizer" />
+
               <div className="spectrum-label">{playing ? "audio reactive" : "play a track to start the visualizer"}</div>
             </div>
           </section>
