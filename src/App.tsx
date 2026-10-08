@@ -224,6 +224,7 @@ function App() {
           </section>}
           {active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
 
+          <div className="now-playing-layout">
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
               <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>
@@ -252,6 +253,7 @@ function App() {
               <div className="spectrum-label">{playing ? "audio reactive" : "play a track to start the visualizer"}</div>
             </div>
           </section>
+          </div>
 
           <section className="queue">
             <div className="panel-heading">
