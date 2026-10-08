@@ -42,7 +42,6 @@ function App() {
   const [progress, setProgress] = useState(38);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
-  const [status, setStatus] = useState<"Online" | "Offline" | "Do not disturb">("Offline");
   const current = tracks[track];
 
   useEffect(() => {
@@ -64,16 +63,17 @@ function App() {
       <header className="titlebar">
         <div className="app-name"><span className="app-symbol">A</span><span>AetherWave</span></div>
         <div className="titlebar-center">{active}</div>
+        <div className="titlebar-profile">
+          <a className="profile-link" href="https://open.spotify.com/" target="_blank" rel="noreferrer" aria-label="Open Spotify">
+            <img className="profile-avatar" src="https://github.com/alyawiguna310-blip.png?size=128" alt="" />
+            <span><strong>Music</strong><small>Local session</small></span>
+          </a>
+        </div>
         <div className="window-actions" aria-hidden="true"><span>•</span><span>•</span><span>•</span></div>
       </header>
 
       <div className="layout">
         <aside className="sidebar">
-          <div className="library-heading">
-            <div className="avatar">AW</div>
-            <div><strong>Music</strong><small>Local session</small></div>
-          </div>
-
           <div className="nav-label">NAVIGATION <span className="nav-count">4</span></div>
           <nav>
             {navItems.map(({ name, icon }) => (
@@ -89,19 +89,6 @@ function App() {
             <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Liked tracks</span><small>128</small></button>
             <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Chillwave</span><small>24</small></button>
             <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Late Night</span><small>16</small></button>
-          </div>
-
-          <div className="source-card">
-            <div className="source-icon"><Icon name="music" size={14} /></div>
-            <div className="source-copy"><strong>AETHERWAVE</strong><small>Desktop music session</small></div>
-            <i className={status === "Online" ? "status-dot online" : status === "Do not disturb" ? "status-dot dnd" : "status-dot"} />
-            <div className="status-picker" aria-label="Session status">
-              {(["Online", "Offline", "Do not disturb"] as const).map((option) => (
-                <button key={option} className={status === option ? "status-option active" : "status-option"} onClick={() => { setStatus(option); setMessage(`Status: ${option}`); }}>
-                  <span />{option}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="sidebar-footer">
