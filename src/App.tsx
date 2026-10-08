@@ -73,20 +73,28 @@ function App() {
             <div><strong>Music</strong><small>Local session</small></div>
           </div>
 
-          <div className="nav-label">NAVIGATION</div>
+          <div className="nav-label">NAVIGATION <span className="nav-count">4</span></div>
           <nav>
             {navItems.map(({ name, icon }) => (
               <button key={name} className={active === name ? "nav-link active" : "nav-link"} onClick={() => setActive(name)}>
-                <span className="nav-icon"><Icon name={icon} /></span><span>{name}</span>
+                <span className="nav-icon"><Icon name={icon} /></span><span>{name}</span><span className="nav-arrow">›</span>
               </button>
             ))}
           </nav>
 
-          <div className="nav-label library-label">PLAYLISTS</div>
-          <button className="playlist-link"><span className="playlist-icon"><Icon name="plus" size={15} /></span><span>Create playlist</span></button>
-          <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Liked tracks</span></button>
-          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Chillwave</span></button>
-          <button className="playlist-link"><span className="playlist-icon">♪</span><span>Late Night</span></button>
+          <div className="nav-label library-label">PLAYLISTS <span className="nav-count">3</span></div>
+          <div className="playlist-group">
+            <button className="playlist-link create"><span className="playlist-icon"><Icon name="plus" size={15} /></span><span>Create playlist</span><small>+</small></button>
+            <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Liked tracks</span><small>128</small></button>
+            <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Chillwave</span><small>24</small></button>
+            <button className="playlist-link"><span className="playlist-icon"><Icon name="music" size={15} /></span><span>Late Night</span><small>16</small></button>
+          </div>
+
+          <div className="source-card">
+            <div className="source-icon"><Icon name="music" size={14} /></div>
+            <div><strong>LOCAL MUSIC</strong><small>Library is ready</small></div>
+            <i />
+          </div>
 
           <div className="sidebar-footer">
             <div><span>Library</span><b>128 tracks</b></div>
