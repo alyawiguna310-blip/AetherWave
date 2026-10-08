@@ -8,10 +8,10 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; min-height: 100%; }
-body { margin: 0; min-width: 980px; min-height: 100vh; background: #17191d; }
+body { margin: 0; min-width: 980px; min-height: 100vh; overflow: hidden; background: #17191d; }
 button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
-.app { --accent: #8b7cff; min-height: 100vh; background: #191b1f; }
+.app { --accent: #8b7cff; width: 100%; height: 100vh; min-height: 0; overflow: hidden; background: #191b1f; }
 
 .titlebar {
   height: 42px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center;
@@ -21,10 +21,10 @@ button { border: 0; cursor: pointer; }
 .app-name { display: flex; align-items: center; gap: 8px; font-weight: 650; }
 .app-symbol { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; background: var(--accent); color: #101116; font-weight: 800; font-size: 11px; }
 .titlebar-center { text-align: center; color: #8b919b; font-size: 11px; }
-.window-actions { display: flex; justify-content: flex-end; gap: 18px; color: #858b95; }
+.window-actions { display: flex; justify-content: flex-end; gap: 5px; color: #858b95; }\n.window-actions span { width: 7px; height: 7px; border-radius: 50%; background: #555b64; font-size: 0; }
 .window-actions span:last-child:hover { color: #e36b6b; }
 
-.layout { display: flex; min-height: calc(100vh - 112px); }
+.layout { display: flex; height: calc(100vh - 112px); min-height: 0; }
 .sidebar {
   width: 218px; flex: 0 0 218px; display: flex; flex-direction: column;
   padding: 16px 10px; background: #1e2125; border-right: 1px solid #0f1114;
@@ -100,7 +100,7 @@ nav { display: grid; gap: 2px; }
   background-image: linear-gradient(#ffffff08 1px, transparent 1px), linear-gradient(90deg, #ffffff08 1px, transparent 1px);
   background-size: 36px 34px;
 }
-.spectrum-bars { position: absolute; left: 8px; right: 8px; top: 28px; bottom: 28px; display: flex; align-items: center; gap: 5px; }
+.spectrum-bars { position: absolute; left: 8px; right: 8px; top: 20px; bottom: 28px; display: flex; align-items: center; gap: 5px; }
 .spectrum-bars i {
   flex: 1; min-width: 2px; max-width: 9px; margin: 0 auto; border-radius: 1px 1px 0 0;
   background: var(--accent); opacity: .7; animation: spectrum 1s ease-in-out infinite alternate;
