@@ -361,3 +361,19 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
     border-top: 0;
   }
 }
+
+
+/* Keep the spectrum visual-only: hide all visual-engine copy. */
+.now-playing-layout .visualizer-panel .panel-heading {
+  display: none;
+}
+.now-playing-layout .visualizer-panel .spectrum-label {
+  opacity: 0;
+  pointer-events: none;
+}
+.now-playing-layout .visualizer-panel {
+  justify-content: stretch;
+}
+.now-playing-layout .spectrum {
+  align-self: stretch;
+}
