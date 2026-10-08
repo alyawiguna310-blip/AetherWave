@@ -42,6 +42,7 @@ function App() {
   const [progress, setProgress] = useState(38);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
+  const [status, setStatus] = useState<"Online" | "Offline" | "Do not disturb">("Offline");
   const current = tracks[track];
 
   useEffect(() => {
@@ -92,8 +93,15 @@ function App() {
 
           <div className="source-card">
             <div className="source-icon"><Icon name="music" size={14} /></div>
-            <div><strong>LOCAL MUSIC</strong><small>Library is ready</small></div>
-            <i />
+            <div className="source-copy"><strong>AETHERWAVE</strong><small>Desktop music session</small></div>
+            <i className={status === "Online" ? "status-dot online" : status === "Do not disturb" ? "status-dot dnd" : "status-dot"} />
+            <div className="status-picker" aria-label="Session status">
+              {(["Online", "Offline", "Do not disturb"] as const).map((option) => (
+                <button key={option} className={status === option ? "status-option active" : "status-option"} onClick={() => { setStatus(option); setMessage(`Status: ${option}`); }}>
+                  <span />{option}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="sidebar-footer">
