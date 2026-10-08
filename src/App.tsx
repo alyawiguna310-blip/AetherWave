@@ -50,6 +50,13 @@ function App() {
   const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
   useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.src = current.url ?? "";
+      audioRef.current.load();
+    }
+  }, [current.url]);
+
+  useEffect(() => {
     if (!playing) return;
     const timer = window.setInterval(() => setProgress((p) => p >= 100 ? 0 : p + 0.25), 1000);
     return () => window.clearInterval(timer);
@@ -102,7 +109,8 @@ function App() {
           </div>
         </aside>
 
-        <main className="content">\n          <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
+        <main className="content">
+          <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
             <div className="heading-actions"><button className="import-button" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={14} /><span>Import music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
@@ -157,7 +165,8 @@ function App() {
         </main>
       </div>
 
-      <footer className="player">\n        <audio ref={audioRef} preload="metadata" onLoadedMetadata={(e) => { const duration = e.currentTarget.duration; setLocalTracks((items) => items.map((item, i) => i === track ? { ...item, duration: formatTime(duration) } : item)); }} onTimeUpdate={(e) => { const time = e.currentTarget.currentTime; const duration = e.currentTarget.duration; setCurrentTime(time); setProgress(duration ? (time / duration) * 100 : 0); }} onEnded={next} />
+      <footer className="player">
+        <audio ref={audioRef} preload="metadata" onLoadedMetadata={(e) => { const duration = e.currentTarget.duration; setLocalTracks((items) => items.map((item, i) => i === track ? { ...item, duration: formatTime(duration) } : item)); }} onTimeUpdate={(e) => { const time = e.currentTarget.currentTime; const duration = e.currentTarget.duration; setCurrentTime(time); setProgress(duration ? (time / duration) * 100 : 0); }} onEnded={next} />
         <div className="player-song"><div className="mini-cover" style={{ background: current.accent }}>A</div><div><b>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
           <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => setPlaying(!playing)}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
