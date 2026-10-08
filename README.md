@@ -4,6 +4,10 @@ A desktop music app for Windows and Linux that combines music playback with reac
 
 AetherWave is being built around the idea that music should not only sound good — it should look good too.
 
+> **Under Construction — Still developing :v**
+>
+> The project is actively being developed. Features, architecture, and implementation details may change as AetherWave grows.
+
 ## What is AetherWave?
 
 AetherWave aims to combine:
@@ -20,9 +24,11 @@ AetherWave aims to combine:
 
 ## Current Status
 
-**Phase 2 — UI foundation:** in progress. The Linux-inspired desktop shell, queue, player controls, and visualizer prototype are being refined before moving to real audio playback.
+**Phase 3 — Local music engine:** in progress.
 
-The current build is still a frontend prototype with fake tracks. No real music streaming or local-file playback is wired in yet.
+Phase 2, the Linux-inspired UI foundation, is now considered the current UI baseline. Further UI changes will only be made when needed for functionality, bugs, usability, or future features.
+
+The current build is transitioning from the frontend prototype into real local music playback. Online music services and the full reactive visual system will come later.
 
 ## Planned Architecture
 
@@ -111,8 +117,8 @@ Spotify and YouTube remain the property of their respective owners. AetherWave i
 ## Roadmap
 
 - **Phase 1 — Project foundation** — complete
-- **Phase 2 — Linux-inspired UI** — in progress
-- **Phase 3 — Local music engine** — next
+- **Phase 2 — Linux-inspired UI** — complete / baseline established
+- **Phase 3 — Local music engine** — in progress
 - **Phase 4 — Web Audio visualizer** — planned
 - **Phase 5 — Reactive animated scenes** — planned
 - **Phase 6 — Spotify / YouTube / Navidrome integration** — planned
