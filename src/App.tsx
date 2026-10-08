@@ -10,6 +10,12 @@ const tracks: Track[] = [
   { title: "Nightcall", artist: "Kavinsky", album: "OutRun", duration: "4:18", accent: "#c77a93" },
 ];
 
+const librarySources = [
+  { name: "Spotify", icon: "spotify" },
+  { name: "YouTube Music", icon: "youtube" },
+  { name: "Local", icon: "folder" },
+] as const;
+
 const navItems = [
   { name: "Home", icon: "home" },
   { name: "Search", icon: "search" },
@@ -30,6 +36,10 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
   if (name === "prev") return <svg {...p}><path d="M6 5v14M18 6l-8 6 8 6z" /></svg>;
   if (name === "next") return <svg {...p}><path d="M18 5v14M6 6l8 6-8 6z" /></svg>;
   if (name === "volume") return <svg {...p}><path d="M4 10v4h4l5 4V6l-5 4z" /><path d="M16 9.5a4 4 0 0 1 0 5M18.5 7a7.5 7.5 0 0 1 0 10" /></svg>;
+  if (name === "download") return <svg {...p}><path d="M12 4v10M8 11l4 4 4-4M5 19h14" /></svg>;
+  if (name === "spotify") return <svg {...p}><circle cx="12" cy="12" r="9" /><path d="M7.2 9.3c3.1-1.2 6.5-1.1 9.6.2M8.2 12.2c2.5-.8 5.1-.7 7.6.3M9.3 15c1.8-.5 3.7-.4 5.4.2" /></svg>;
+  if (name === "youtube") return <svg {...p}><rect x="3" y="6" width="18" height="12" rx="3" /><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none" /></svg>;
+  if (name === "folder") return <svg {...p}><path d="M3.5 7.5h6l1.5 2h9.5v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /><path d="M3.5 7.5V6a2 2 0 0 1 2-2h4l1.5 2h7.5a2 2 0 0 1 2 2v1.5" /></svg>;
   if (name === "settings") return <svg {...p}><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /><path d="m4.9 15.2-1.1 1.9 2.1 2.1 1.9-1.1M8.8 20.2l2.2.6.9-2.1M15.2 20.2l-2.2.6-.9-2.1M19.1 15.2l1.1 1.9-2.1 2.1-1.9-1.1M19.1 8.8l1.1-1.9-2.1-2.1-1.9 1.1M15.2 3.8l-2.2-.6-.9 2.1M8.8 3.8l-2.2-.6-.9 2.1M4.9 8.8 3.8 6.9l2.1-2.1 1.9 1.1" /></svg>;
   if (name === "trash") return <svg {...p}><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
@@ -37,6 +47,7 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
 
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
+  const [librarySource, setLibrarySource] = useState<(typeof librarySources)[number]["name"]>("Local");
   const [track, setTrack] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -46,7 +57,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
-  const availableTracks = localTracks.length ? localTracks : tracks;
+  const availableTracks = librarySource === "Local" ? localTracks : tracks;
   const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
   useEffect(() => {
@@ -66,7 +77,10 @@ function App() {
     8 + Math.abs(Math.sin(i * 0.43) * 32 + Math.sin(i * 0.16) * 14)
   ), []);
 
-  const selectTrack = (index: number) => { setTrack(index); setProgress(0); setPlaying(true); setMessage(`Playing ${tracks[index].title}`); };
+  const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
+
+  const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
+  const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setLibrarySource("Local"); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
   const next = () => selectTrack((track + 1) % tracks.length);
   const previous = () => selectTrack((track - 1 + tracks.length) % tracks.length);
 
@@ -113,8 +127,11 @@ function App() {
           <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
-            <div className="heading-actions"><button className="import-button" onClick={() => fileInputRef.current?.click()}><Icon name="plus" size={14} /><span>Import music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
+            <div className="heading-actions"><button className="download-button" onClick={() => fileInputRef.current?.click()}><Icon name="download" size={14} /><span>Download Music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
           </div>
+
+          {active === "Library" && <section className="library-sources">{librarySources.map(({ name, icon }) => <button key={name} className={librarySource === name ? "source-tab active" : "source-tab"} onClick={() => { setLibrarySource(name); setTrack(0); setPlaying(false); setProgress(0); setMessage(name === "Local" ? "Downloaded Music" : `${name} sync coming soon`); }}><Icon name={icon} size={15} /><span>{name}</span></button>)}</section>}
+          {active === "Library" && librarySource === "Local" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">LOCAL LIBRARY</span><h3>Download Music</h3><p>Downloaded music will appear here.</p></div></section>}
 
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
