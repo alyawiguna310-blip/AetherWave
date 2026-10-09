@@ -29,7 +29,6 @@ fn decode_vdf_paths(content: &str) -> Vec<PathBuf> {
         if fields.len() >= 5 && fields[1] == "path" {
             paths.push(PathBuf::from(fields[3].replace("\\\\", "\\")));
         }
-        expect_path = false;
     }
     paths
 }
