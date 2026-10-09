@@ -13,6 +13,7 @@ import {
   idleLevels,
 } from "./lib/visualizer";
 import "./App.css";
+import WallpaperEnginePage from "./WallpaperEnginePage";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
 type YouTubeVideo = {
@@ -40,6 +41,7 @@ const navItems = [
   { name: "Search", icon: "search" },
   { name: "Library", icon: "library" },
   { name: "Visuals", icon: "visuals" },
+  { name: "Wallpaper", icon: "visuals" },
 ] as const;
 
 function Icon({ name, size = 17 }: { name: string; size?: number }) {
