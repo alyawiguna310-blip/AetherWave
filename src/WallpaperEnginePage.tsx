@@ -14,6 +14,7 @@ type WallpaperItem = {
 
 export default function WallpaperEnginePage() {
   const [items, setItems] = useState<WallpaperItem[]>([]);
+  const [thumbnailById, setThumbnailById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -28,6 +29,16 @@ export default function WallpaperEnginePage() {
     try {
       const found = await invoke<WallpaperItem[]>("scan_wallpaper_engine_library");
       setItems(found);
+      const thumbnails: Record<string, string> = {};
+      await Promise.all(found.map(async (item) => {
+        try {
+          const image = await invoke<string | null>("load_wallpaper_thumbnail", { id: item.id });
+          if (image) thumbnails[item.id] = image;
+        } catch {
+          // A missing or unreadable thumbnail should not prevent the library from loading.
+        }
+      }));
+      setThumbnailById(thumbnails);
       setSelected((current) => current ? found.find((item) => item.id === current.id) ?? null : null);
     } catch (e) {
       setError(typeof e === "string" ? e : "Could not scan the Steam Workshop library.");
@@ -92,7 +103,7 @@ export default function WallpaperEnginePage() {
         {visible.map((item) => (
           <button key={item.id} className={selected?.id === item.id ? "wallpaper-card selected" : "wallpaper-card"} onClick={() => { setSelected(item); setError(""); setStatus(""); }}>
             <div className="wallpaper-thumb">
-              {item.preview_path ? <img loading="lazy" src={convertFileSrc(item.preview_path)} alt="" /> : <span>{item.kind.toUpperCase()}</span>}
+              {thumbnailById[item.id] ? <img loading="lazy" src={thumbnailById[item.id]} alt="" /> : <span>{item.kind.toUpperCase()}</span>}
               <span className="wallpaper-play">Select</span>
             </div>
             <span className="wallpaper-title">{item.title}</span>
@@ -110,8 +121,8 @@ export default function WallpaperEnginePage() {
             </div>
             {selected.video_path
               ? <video key={selected.id} src={convertFileSrc(selected.video_path)} muted autoPlay loop playsInline controls={false} />
-              : selected.preview_path
-                ? <img className="wallpaper-static-preview" src={convertFileSrc(selected.preview_path)} alt={selected.title} />
+              : thumbnailById[selected.id]
+                ? <img className="wallpaper-static-preview" src={thumbnailById[selected.id]} alt={selected.title} />
                 : <div className="wallpaper-no-preview">No in-app preview available for this {selected.kind} wallpaper.</div>}
             <p>{selected.audio_note}. The audio-metadata filter is heuristic; applying a wallpaper uses Wallpaper Engine's own renderer.</p>
             <div className="wallpaper-apply-row">
