@@ -17,6 +17,7 @@ pub struct WallpaperItem {
     pub description: Option<String>,
     pub kind: String,
     pub preview_path: Option<String>,
+    pub image_path: Option<String>,
     pub video_path: Option<String>,
     pub has_audio_hint: bool,
     pub audio_note: String,
@@ -123,6 +124,35 @@ fn find_video(folder: &Path) -> Option<PathBuf> {
     None
 }
 
+fn find_image(folder: &Path) -> Option<PathBuf> {
+    let mut stack = vec![folder.to_path_buf()];
+    let mut visited = 0usize;
+    let mut candidates: Vec<(u64, PathBuf)> = Vec::new();
+    while let Some(dir) = stack.pop() {
+        if visited >= 160 { break; }
+        visited += 1;
+        let Ok(entries) = fs::read_dir(dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let name = path.file_name().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+            if ["preview.", "screenshot.", "thumbnail."].iter().any(|prefix| name.starts_with(prefix)) {
+                continue;
+            }
+            let is_image = path.extension().and_then(|x| x.to_str()).is_some_and(|ext| {
+                matches!(ext.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "webp" | "bmp")
+            });
+            if !is_image { continue; }
+            let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            candidates.push((size, path));
+        }
+    }
+    candidates.into_iter().max_by_key(|(size, _)| *size).map(|(_, path)| path)
+}
+
 fn metadata(folder: &Path) -> Option<Value> {
     fs::read_to_string(folder.join("project.json")).ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
@@ -163,7 +193,9 @@ fn scan_items() -> Vec<WallpaperItem> {
             let has_audio_hint = data.as_ref().is_some_and(contains_audio_hint);
             let preview = preview_file(&folder);
             let video = find_video(&folder);
+            let image = find_image(&folder);
             let kind = if type_hint.contains("video") || (type_hint == "unknown" && video.is_some()) { "video" }
+                else if type_hint.contains("image") { "image" }
                 else if type_hint.contains("scene") { "scene" }
                 else if type_hint.contains("web") { "web" }
                 else if type_hint.contains("application") { "application" }
@@ -171,6 +203,7 @@ fn scan_items() -> Vec<WallpaperItem> {
             items.push(WallpaperItem {
                 id, title, description, kind: kind.to_string(),
                 preview_path: preview.map(|p| p.to_string_lossy().into_owned()),
+                image_path: if type_hint.contains("image") { image.map(|p| p.to_string_lossy().into_owned()) } else { None },
                 video_path: video.map(|p| p.to_string_lossy().into_owned()),
                 has_audio_hint,
                 audio_note: if has_audio_hint {
