@@ -263,8 +263,7 @@ pub fn run() {
             system_audio::stop_system_audio,
             wallpaper_engine::scan_wallpaper_engine_library,
             wallpaper_engine::get_wallpaper_engine_status,
-            wallpaper_engine::load_wallpaper_thumbnail,
-            wallpaper_engine::apply_wallpaper_engine_wallpaper
+            wallpaper_engine::load_wallpaper_thumbnail
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
