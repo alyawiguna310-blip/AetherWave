@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
@@ -75,6 +77,8 @@ function App() {
   const [youtubeDuration, setYoutubeDuration] = useState(0);
   const [showYouTubeVideo, setShowYouTubeVideo] = useState(false);
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState(false);
+  const systemSpectrumRef = useRef<number[]>([]);
 
   useEffect(() => {
     try {
@@ -85,6 +89,44 @@ function App() {
     } finally {
       setCredentialsLoaded(true);
     }
+  }, []);
+
+  const toggleSystemAudioCapture = async () => {
+    if (systemAudioEnabled) {
+      try {
+        await invoke("stop_system_audio_capture");
+        setSystemAudioEnabled(false);
+        systemSpectrumRef.current = [];
+        setMessage("System audio capture stopped");
+      } catch {
+        setMessage("Could not stop system audio capture");
+      }
+      return;
+    }
+    try {
+      await invoke("start_system_audio_capture");
+      setSystemAudioEnabled(true);
+      setMessage("Listening to system audio for the spectrum");
+    } catch {
+      setMessage("System audio capture requires the installed Windows app");
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void listen<number[]>("system-audio-spectrum", (event) => {
+      systemSpectrumRef.current = event.payload;
+    }).then((stopListening) => {
+      if (cancelled) stopListening();
+      else unlisten = stopListening;
+    }).catch(() => {
+      // Browser preview does not expose Tauri's native system-audio events.
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   const saveIntegrations = () => {
@@ -294,7 +336,9 @@ function App() {
         const barWidth = Math.max(1, (width - gap * (count - 1)) / count);
         const isYouTubeActive = Boolean(selectedYouTubeVideo && youtubeIsPlaying);
         const isLocalActive = Boolean(!selectedYouTubeVideo && playing && audio && !audio.paused && audio.currentSrc);
-        const isActive = isYouTubeActive || isLocalActive;
+        const systemBins = systemSpectrumRef.current;
+        const hasSystemSpectrum = systemAudioEnabled && systemBins.length === count;
+        const isActive = hasSystemSpectrum ? systemBins.some((value) => value > 0.025) : isYouTubeActive || isLocalActive;
         const styleTarget = document.querySelector(".app") ?? canvas;
         const accent = getComputedStyle(styleTarget).getPropertyValue("--accent").trim() || "#8b7cff";
         const now = performance.now();
@@ -305,7 +349,7 @@ function App() {
           const pulse = 0.10
             + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54
             + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
-          const level = isYouTubeActive ? Math.min(1, pulse) : isLocalActive && data ? bin : idle;
+          const level = hasSystemSpectrum ? systemBins[i] : isYouTubeActive ? Math.min(1, pulse) : isLocalActive && data ? bin : idle;
           const barHeight = Math.max(2 * dpr, level * height * 0.86);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
@@ -324,7 +368,7 @@ function App() {
 
     frame = window.requestAnimationFrame(draw);
     return () => window.cancelAnimationFrame(frame);
-  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url, showSettings]);
+  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url, showSettings, systemAudioEnabled]);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
@@ -451,12 +495,12 @@ function App() {
           <section className="visualizer-panel">
             <div className="panel-heading">
               <div><span className="kicker">VISUAL ENGINE</span><h3>Audio spectrum</h3></div>
-              <span className="status"><i />{playing ? "ACTIVE" : "IDLE"}<b />{message}</span>
+              <span className="status"><i />{systemAudioEnabled ? "SYSTEM AUDIO" : playing ? "ACTIVE" : "IDLE"}<b />{message}</span><button className="settings" onClick={() => void toggleSystemAudioCapture()}>{systemAudioEnabled ? "Stop system audio" : "Enable system audio"}</button>
             </div>
             <div className="spectrum">
               <canvas ref={spectrumCanvasRef} className="spectrum-canvas" aria-label="Audio frequency spectrum visualizer" />
 
-              <div className="spectrum-label">{playing ? "audio reactive" : "play a track to start the visualizer"}</div>
+              <div className="spectrum-label">{systemAudioEnabled ? "real-time system audio spectrum" : playing ? "local audio reactive · YouTube simulated" : "play a track to start the visualizer"}</div>
             </div>
           </section>
           </div>}
