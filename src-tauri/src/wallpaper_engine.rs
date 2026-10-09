@@ -44,7 +44,7 @@ fn steam_roots() -> Vec<PathBuf> {
     if let Some(local) = std::env::var_os("LOCALAPPDATA") {
         roots.insert(PathBuf::from(local).join("Programs/Steam"));
     }
-    for drive in ["C:", "D:", "E:", "F:", "G:", "H:"] {
+    for drive in ["C:/", "D:/", "E:/", "F:/", "G:/", "H:/"] {
         for suffix in ["Steam", "SteamLibrary", "Games/Steam", "Games/SteamLibrary"] {
             roots.insert(PathBuf::from(drive).join(suffix));
         }
@@ -249,7 +249,12 @@ pub fn apply_wallpaper_engine_wallpaper(id: String) -> Result<String, String> {
         return Err("Wallpaper path is outside the detected Workshop folder.".into());
     }
 
-    let entry = wallpaper_entry(&canonical_folder)?;
+    let entry = wallpaper_entry(&canonical_folder)?
+        .canonicalize()
+        .map_err(|e| format!("Could not resolve wallpaper entry file: {e}"))?;
+    if !entry.starts_with(&canonical_folder) || !entry.is_file() {
+        return Err("Wallpaper entry file resolves outside its Workshop folder.".into());
+    }
     let executable = find_wallpaper_engine_executable().ok_or_else(|| {
         "Wallpaper Engine executable was not found in detected Steam libraries. Open Steam and verify the Wallpaper Engine installation.".to_string()
     })?;
