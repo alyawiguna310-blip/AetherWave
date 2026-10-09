@@ -71,6 +71,7 @@ function App() {
   const [searchedQuery, setSearchedQuery] = useState("");
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [youtubeError, setYoutubeError] = useState("");
+  const [selectedYouTubeVideo, setSelectedYouTubeVideo] = useState<YouTubeVideo | null>(null);
 
   useEffect(() => {
     try {
@@ -134,12 +135,9 @@ function App() {
     }
   };
 
-  const openYouTubeVideo = async (videoId: string) => {
-    try {
-      await openUrl(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`);
-    } catch {
-      setMessage("Could not open YouTube in your browser");
-    }
+  const playYouTubeVideo = (video: YouTubeVideo) => {
+    setSelectedYouTubeVideo(video);
+    setMessage(`Playing ${video.snippet.title}`);
   };
 
   const availableTracks = localTracks;
@@ -328,18 +326,22 @@ function App() {
             {!searchedQuery && !youtubeError ? <div className="browse-section"><div className="panel-heading"><div><span className="kicker">START EXPLORING</span><h3>Browse music</h3></div></div><div className="browse-grid">
               {[{name:"Electronic",tone:"violet",hint:"Synths & late nights"},{name:"Chill",tone:"blue",hint:"Slow down a little"},{name:"Indie",tone:"rose",hint:"Find your next favorite"},{name:"Ambient",tone:"teal",hint:"Soundscapes to drift to"}].map((item) => <button key={item.name} className={"browse-card " + item.tone} onClick={() => { setSearchQuery(item.name); void searchYouTube(item.name); }}><span>{item.name}</span><small>{item.hint}</small><i><Icon name="music" size={26} /></i></button>)}
             </div><p className="search-note">Searches real YouTube videos. Add your API key in Preferences if you haven’t already.</p></div> : <div className="search-results"><div className="panel-heading"><div><span className="kicker">YOUTUBE RESULTS</span><h3>{searchedQuery ? `Results for “${searchedQuery}”` : "Search YouTube"}</h3></div><span className="result-count">{youtubeLoading ? "SEARCHING…" : `${youtubeResults.length} VIDEOS`}</span></div>
+              {selectedYouTubeVideo && <section className="youtube-player-panel" aria-label="YouTube player">
+                <div className="youtube-player-frame"><iframe key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>
+                <div className="youtube-player-caption"><b>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => setSelectedYouTubeVideo(null)}>Close player</button></div>
+              </section>}
               {youtubeError && <div className="youtube-error" role="alert"><Icon name="search" size={18} /><span>{youtubeError}</span>{!youtubeApiKey.trim() && <button className="settings" onClick={() => setShowSettings(true)}>Open Preferences</button>}</div>}
               {youtubeLoading && <div className="youtube-loading"><span className="youtube-spinner" /> Searching YouTube…</div>}
               {!youtubeLoading && !youtubeError && youtubeResults.map((item) => {
                 const thumbnail = item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.high?.url ?? item.snippet.thumbnails?.default?.url;
-                return <button className="youtube-result-row" key={item.id.videoId} onClick={() => void openYouTubeVideo(item.id.videoId)} title="Open this video on YouTube">
+                return <button className={selectedYouTubeVideo?.id.videoId === item.id.videoId ? "youtube-result-row selected" : "youtube-result-row"} key={item.id.videoId} onClick={() => playYouTubeVideo(item)} title="Play this video inside AetherWave">
                   {thumbnail ? <img className="youtube-thumbnail" src={thumbnail} alt="" loading="lazy" /> : <span className="youtube-thumbnail youtube-thumbnail-fallback"><Icon name="youtube" size={22} /></span>}
                   <span className="youtube-result-copy"><b>{item.snippet.title}</b><small>{item.snippet.channelTitle}</small><span>{item.snippet.description || "No description available."}</span></span>
                   <span className="youtube-open"><Icon name="play" size={15} /></span>
                 </button>;
               })}
               {!youtubeLoading && !youtubeError && searchedQuery && !youtubeResults.length && <div className="search-no-results"><Icon name="search" size={22} /><b>No videos found</b><span>Try a different song title or artist.</span></div>}
-              <p className="search-note">Selecting a result opens YouTube in your browser. This first step searches the catalog; in-app playback is not connected yet.</p>
+              <p className="search-note">Select a result to play it here. Some videos may not allow embedded playback due to their owner’s settings or regional restrictions.</p>
             </div>}
           </section>}
           {!showSettings && active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
