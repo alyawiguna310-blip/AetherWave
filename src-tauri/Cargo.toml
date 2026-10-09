@@ -22,10 +22,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rustfft = "6.2"
-
-[target.'cfg(target_os = "windows")'.dependencies]
-wasapi = "0.23"
+tauri-plugin-wasapi = { git = "https://github.com/CryptoPunk/tauri-plugin-wasapi" }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
