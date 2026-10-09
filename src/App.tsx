@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { startCapture, stopCapture } from "tauri-plugin-wasapi-api";
+import { startCapture, stopCapture } from "./lib/wasapi";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; path?: string; fileName?: string; durationSeconds?: number };
@@ -124,7 +124,7 @@ function calculateSystemSpectrum(buffer: Float32Array, writeIndex: number): numb
 }
 
 function App() {
-  const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
+  const [active, setActive] = useState<(typeof navItems)[number]["name"]>("Home");
   const [searchProvider, setSearchProvider] = useState<"YouTube" | "Spotify">("YouTube");
   const [searchQuery, setSearchQuery] = useState("");
   const [track, setTrack] = useState(0);
@@ -150,6 +150,8 @@ function App() {
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false);
   const systemSpectrumRef = useRef<number[]>([]);
+  const smoothedSpectrumRef = useRef<number[]>(Array(56).fill(0));
+  const peakSpectrumRef = useRef<number[]>(Array(56).fill(0));
 
   useEffect(() => {
     try {
@@ -181,6 +183,8 @@ function App() {
     systemAudioBufferRef.current.fill(0);
     systemAudioWriteRef.current = 0;
     systemSpectrumRef.current = [];
+    smoothedSpectrumRef.current.fill(0);
+    peakSpectrumRef.current.fill(0);
     try {
       await startCapture(
         { sessionId: "system-audio", loopback: true, sampleRate: 16000, channels: 1 },
@@ -188,7 +192,8 @@ function App() {
           if (event.event === "data") {
             if (event.data.sessionId !== "system-audio") return;
             const bytes = new Uint8Array(event.data.data);
-            const pcm = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
+            const usableBytes = bytes.byteLength - (bytes.byteLength % 4);
+            const pcm = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + usableBytes));
             const ring = systemAudioBufferRef.current;
             let write = systemAudioWriteRef.current;
             for (let i = 0; i < pcm.length; i++) {
@@ -200,10 +205,14 @@ function App() {
           } else if (event.event === "error") {
             setSystemAudioEnabled(false);
             systemSpectrumRef.current = [];
+            smoothedSpectrumRef.current.fill(0);
+            peakSpectrumRef.current.fill(0);
             setMessage(`System audio capture failed: ${event.data.message}`);
           } else if (event.event === "stopped") {
             setSystemAudioEnabled(false);
             systemSpectrumRef.current = [];
+            smoothedSpectrumRef.current.fill(0);
+            peakSpectrumRef.current.fill(0);
           }
         },
       );
@@ -399,6 +408,8 @@ function App() {
         const isYouTubeActive = Boolean(selectedYouTubeVideo && youtubeIsPlaying);
         const isLocalActive = Boolean(!selectedYouTubeVideo && playing && current.path);
         const systemBins = systemSpectrumRef.current;
+        const smoothedBins = smoothedSpectrumRef.current;
+        const peakBins = peakSpectrumRef.current;
         const hasSystemSpectrum = systemAudioEnabled && systemBins.length === count;
         const isActive = hasSystemSpectrum ? systemBins.some((value) => value > 0.025) : isYouTubeActive || isLocalActive;
         const styleTarget = document.querySelector(".app") ?? canvas;
@@ -407,8 +418,12 @@ function App() {
         for (let i = 0; i < count; i++) {
           const idle = 0.025 + Math.abs(Math.sin(i * 0.43) * 0.045 + Math.sin(i * 0.16) * 0.025);
           const pulse = 0.10 + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54 + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
-          const level = hasSystemSpectrum ? systemBins[i] : (isYouTubeActive || isLocalActive) ? Math.min(1, pulse) : idle;
-          const barHeight = Math.max(2 * dpr, level * height * 0.86);
+          const target = hasSystemSpectrum ? systemBins[i] : (isYouTubeActive || isLocalActive) ? Math.min(1, pulse) : idle;
+          const prior = smoothedBins[i] ?? 0;
+          const level = prior + (target - prior) * (target > prior ? 0.42 : 0.16);
+          smoothedBins[i] = level;
+          peakBins[i] = Math.max(level, (peakBins[i] ?? 0) - 0.006);
+          const barHeight = Math.max(2 * dpr, level * height * 0.82);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
           const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
@@ -417,6 +432,12 @@ function App() {
           ctx.fillStyle = gradient;
           ctx.globalAlpha = isActive ? 0.95 : 0.5;
           ctx.fillRect(x, y, barWidth, barHeight);
+          if (isActive && peakBins[i] > 0.025) {
+            const peakY = (height - Math.max(2 * dpr, peakBins[i] * height * 0.82)) / 2;
+            ctx.globalAlpha = 0.72;
+            ctx.fillStyle = accent;
+            ctx.fillRect(x, Math.max(0, peakY - 1.5 * dpr), barWidth, 1.5 * dpr);
+          }
         }
         ctx.globalAlpha = 1;
       }
@@ -632,7 +653,7 @@ function App() {
             <div className="spectrum">
               <canvas ref={spectrumCanvasRef} className="spectrum-canvas" aria-label="Audio frequency spectrum visualizer" />
 
-              <div className="spectrum-label">{systemAudioEnabled ? "real-time system audio spectrum" : playing ? "local audio reactive · YouTube simulated" : "play a track to start the visualizer"}</div>
+              <div className="spectrum-label">{systemAudioEnabled ? "live Windows audio spectrum" : playing ? "animated preview · enable system audio for real spectrum" : "enable system audio for live spectrum bars"}</div>
             </div>
           </section>
           </div>}
