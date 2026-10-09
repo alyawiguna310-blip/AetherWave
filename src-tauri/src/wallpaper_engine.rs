@@ -68,7 +68,7 @@ fn steam_roots() -> BTreeSet<PathBuf> {
     if let Some(path) = std::env::var_os("ProgramFiles(x86)") { roots.insert(PathBuf::from(path).join("Steam")); }
     if let Some(path) = std::env::var_os("ProgramFiles") { roots.insert(PathBuf::from(path).join("Steam")); }
     if let Some(path) = std::env::var_os("LOCALAPPDATA") { roots.insert(PathBuf::from(path).join("Programs/Steam")); }
-    for drive in ["C:", "D:", "E:", "F:", "G:", "H:"] {
+    for drive in ["C:/", "D:/", "E:/", "F:/", "G:/", "H:/"] {
         for suffix in ["Steam", "SteamLibrary", "Games/Steam", "Games/SteamLibrary"] {
             roots.insert(PathBuf::from(drive).join(suffix));
         }
