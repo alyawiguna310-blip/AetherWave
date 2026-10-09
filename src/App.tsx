@@ -99,7 +99,7 @@ function App() {
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false);
   const systemSpectrumRef = useRef<number[]>([]);
   const [visMode, setVisMode] = useState<VisMode>("bars");
-  const [appBackground, setAppBackground] = useState<{ id: string; title: string; video_path: string | null; image_url: string | null } | null>(null);
+  const [appBackground, setAppBackground] = useState<{ id: string; title: string; video_path: string | null; image_path: string | null; image_url: string | null } | null>(null);
   // Kept in refs so smoothing state survives the render-loop effect restarting.
   const smootherRef = useRef(new LevelSmoother());
   const simulatedRef = useRef(new SimulatedSpectrum());
@@ -466,8 +466,10 @@ function App() {
       <div className="app-wallpaper-background" aria-hidden="true">
         {appBackground?.video_path
           ? <video key={appBackground.id} src={convertFileSrc(appBackground.video_path)} autoPlay muted loop playsInline />
-          : appBackground?.image_url
-            ? <img src={appBackground.image_url} alt="" />
+          : appBackground?.image_path
+            ? <img src={convertFileSrc(appBackground.image_path)} alt="" />
+            : appBackground?.image_url
+              ? <img src={appBackground.image_url} alt="" />
             : null}
         {appBackground && <div className="app-wallpaper-shade" />}
       </div>
@@ -624,7 +626,8 @@ function App() {
               id: item.id,
               title: item.title,
               video_path: item.kind === "video" ? item.video_path : null,
-              image_url: item.kind === "video" && item.video_path ? null : thumbnailDataUrl,
+              image_path: item.kind === "image" ? item.image_path : null,
+              image_url: (item.kind === "video" && item.video_path) || (item.kind === "image" && item.image_path) ? null : thumbnailDataUrl,
             });
           }} />}
 
