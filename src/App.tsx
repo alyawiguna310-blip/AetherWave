@@ -318,7 +318,7 @@ function App() {
               ))}
               {!availableTracks.length && <div className="empty-table">No offline tracks yet — use Download Music to add audio files.</div>}
             </div>
-          </section>
+          </section>}
         </main>
       </div>
 
