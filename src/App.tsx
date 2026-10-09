@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { startCapture, stopCapture } from "tauri-plugin-wasapi-api";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
@@ -51,6 +51,76 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
   return <svg {...p}><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
 }
 
+
+const SYSTEM_FFT_SIZE = 2048;
+
+function calculateSystemSpectrum(buffer: Float32Array, writeIndex: number): number[] {
+  const size = SYSTEM_FFT_SIZE;
+  const real = new Float32Array(size);
+  const imag = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    const sample = buffer[(writeIndex + i) % size] ?? 0;
+    const hann = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+    real[i] = sample * hann;
+  }
+
+  // In-place radix-2 FFT.
+  let j = 0;
+  for (let i = 1; i < size; i++) {
+    let bit = size >> 1;
+    while (j & bit) {
+      j ^= bit;
+      bit >>= 1;
+    }
+    j ^= bit;
+    if (i < j) {
+      [real[i], real[j]] = [real[j], real[i]];
+      [imag[i], imag[j]] = [imag[j], imag[i]];
+    }
+  }
+  for (let length = 2; length <= size; length <<= 1) {
+    const angle = (-2 * Math.PI) / length;
+    const stepReal = Math.cos(angle);
+    const stepImag = Math.sin(angle);
+    for (let start = 0; start < size; start += length) {
+      let wr = 1;
+      let wi = 0;
+      const half = length >> 1;
+      for (let k = 0; k < half; k++) {
+        const even = start + k;
+        const odd = even + half;
+        const tr = wr * real[odd] - wi * imag[odd];
+        const ti = wr * imag[odd] + wi * real[odd];
+        real[odd] = real[even] - tr;
+        imag[odd] = imag[even] - ti;
+        real[even] += tr;
+        imag[even] += ti;
+        const nextWr = wr * stepReal - wi * stepImag;
+        wi = wr * stepImag + wi * stepReal;
+        wr = nextWr;
+      }
+    }
+  }
+
+  const bars: number[] = [];
+  const sampleRate = 16000;
+  for (let bar = 0; bar < 56; bar++) {
+    const lowHz = 35 * Math.pow(8000 / 35, bar / 56);
+    const highHz = 35 * Math.pow(8000 / 35, (bar + 1) / 56);
+    const first = Math.max(1, Math.floor((lowHz * size) / sampleRate));
+    const last = Math.min(size / 2, Math.max(first + 1, Math.ceil((highHz * size) / sampleRate)));
+    let power = 0;
+    let bins = 0;
+    for (let bin = first; bin < last; bin++) {
+      power += real[bin] * real[bin] + imag[bin] * imag[bin];
+      bins++;
+    }
+    const magnitude = bins ? Math.sqrt(power / bins) / size : 0;
+    bars.push(Math.min(1, Math.sqrt(magnitude * 28)));
+  }
+  return bars;
+}
+
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number][0]>("Home");
   const [searchProvider, setSearchProvider] = useState<"YouTube" | "Spotify">("YouTube");
@@ -91,54 +161,63 @@ function App() {
     }
   }, []);
 
+  const systemAudioBufferRef = useRef<Float32Array>(new Float32Array(SYSTEM_FFT_SIZE));
+  const systemAudioWriteRef = useRef(0);
+
   const toggleSystemAudioCapture = async () => {
     if (systemAudioEnabled) {
       try {
-        await invoke("stop_system_audio_capture");
+        await stopCapture("system-audio");
         setSystemAudioEnabled(false);
         systemSpectrumRef.current = [];
         setMessage("System audio capture stopped");
-      } catch {
-        setMessage("Could not stop system audio capture");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Could not stop system audio capture");
       }
       return;
     }
+
+    systemAudioBufferRef.current.fill(0);
+    systemAudioWriteRef.current = 0;
+    systemSpectrumRef.current = [];
     try {
-      await invoke("start_system_audio_capture");
+      await startCapture(
+        { sessionId: "system-audio", loopback: true, sampleRate: 16000, channels: 1 },
+        (event) => {
+          if (event.event === "data") {
+            if (event.data.sessionId !== "system-audio") return;
+            const bytes = new Uint8Array(event.data.data);
+            const pcm = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
+            const ring = systemAudioBufferRef.current;
+            let write = systemAudioWriteRef.current;
+            for (let i = 0; i < pcm.length; i++) {
+              ring[write] = Number.isFinite(pcm[i]) ? pcm[i] : 0;
+              write = (write + 1) % ring.length;
+            }
+            systemAudioWriteRef.current = write;
+            systemSpectrumRef.current = calculateSystemSpectrum(ring, write);
+          } else if (event.event === "error") {
+            setSystemAudioEnabled(false);
+            systemSpectrumRef.current = [];
+            setMessage(`System audio capture failed: ${event.data.message}`);
+          } else if (event.event === "stopped") {
+            setSystemAudioEnabled(false);
+            systemSpectrumRef.current = [];
+          }
+        },
+      );
       setSystemAudioEnabled(true);
-      setMessage("Listening to system audio for the spectrum");
-    } catch {
-      setMessage("System audio capture requires the installed Windows app");
+      setMessage("Listening to Windows system audio for the spectrum");
+    } catch (error) {
+      setSystemAudioEnabled(false);
+      setMessage(error instanceof Error ? `System audio capture failed: ${error.message}` : "System audio capture requires the installed Windows app");
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    let unlistenSpectrum: (() => void) | undefined;
-    let unlistenError: (() => void) | undefined;
-    void listen<number[]>("system-audio-spectrum", (event) => {
-      systemSpectrumRef.current = event.payload;
-    }).then((stopListening) => {
-      if (cancelled) stopListening();
-      else unlistenSpectrum = stopListening;
-    }).catch(() => {
-      // Browser preview does not expose Tauri's native system-audio events.
+  useEffect(() => () => {
+    void stopCapture("system-audio").catch(() => {
+      // Capture may never have been started.
     });
-    void listen<string>("system-audio-error", (event) => {
-      setSystemAudioEnabled(false);
-      systemSpectrumRef.current = [];
-      setMessage(`System audio capture failed: ${event.payload}`);
-    }).then((stopListening) => {
-      if (cancelled) stopListening();
-      else unlistenError = stopListening;
-    }).catch(() => {
-      // Native capture errors are only emitted by the Windows desktop app.
-    });
-    return () => {
-      cancelled = true;
-      unlistenSpectrum?.();
-      unlistenError?.();
-    };
   }, []);
 
   const saveIntegrations = () => {
