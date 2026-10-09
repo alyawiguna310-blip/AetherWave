@@ -52,6 +52,32 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
+  const [showSettings, setShowSettings] = useState(false);
+  const [youtubeApiKey, setYoutubeApiKey] = useState("");
+  const [spotifyClientId, setSpotifyClientId] = useState("");
+  const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      setYoutubeApiKey(window.localStorage.getItem("aetherwave.youtubeApiKey") ?? "");
+      setSpotifyClientId(window.localStorage.getItem("aetherwave.spotifyClientId") ?? "");
+    } catch {
+      setMessage("Local credential storage is unavailable in this environment");
+    } finally {
+      setCredentialsLoaded(true);
+    }
+  }, []);
+
+  const saveIntegrations = () => {
+    try {
+      window.localStorage.setItem("aetherwave.youtubeApiKey", youtubeApiKey.trim());
+      window.localStorage.setItem("aetherwave.spotifyClientId", spotifyClientId.trim());
+      setMessage("Integration settings saved on this device");
+      setShowSettings(false);
+    } catch {
+      setMessage("Could not save integration settings");
+    }
+  };
   const availableTracks = localTracks;
   const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
@@ -204,11 +230,32 @@ function App() {
         <main className="content">
           <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
           <div className="page-heading">
-            <div><span className="kicker">MUSIC PLAYER</span><h1>{active === "Home" ? "Home" : active}</h1></div>
-            <div className="heading-actions"><button className="download-button" onClick={() => fileInputRef.current?.click()}><Icon name="download" size={14} /><span>Download Music</span></button><button className="settings" onClick={() => setMessage("Preferences are coming later")}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
+            <div><span className="kicker">MUSIC PLAYER</span><h1>{showSettings ? "Integrations" : active === "Home" ? "Home" : active}</h1></div>
+            <div className="heading-actions"><button className="download-button" onClick={() => fileInputRef.current?.click()}><Icon name="download" size={14} /><span>Download Music</span></button><button className="settings" onClick={() => setShowSettings((value) => !value)}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
           </div>
 
-          {active === "Search" && <section className="search-page">
+          {showSettings && <section className="integrations-page">
+            <div className="integrations-intro">
+              <span className="kicker">CONNECT YOUR MUSIC SOURCES</span>
+              <h2>API credentials</h2>
+              <p>These values are saved in this app on this Windows user profile. They are not sent to GitHub, but browser storage is not encrypted, so only use this on a device you trust.</p>
+            </div>
+            <div className="integration-card">
+              <div className="integration-title"><Icon name="youtube" size={20} /><div><h3>YouTube Data API v3</h3><p>Used to search for YouTube videos.</p></div><span className={youtubeApiKey.trim() ? "integration-status configured" : "integration-status"}>{youtubeApiKey.trim() ? "KEY ADDED" : "NOT SET"}</span></div>
+              <label className="integration-label">API key</label>
+              <input className="credential-input" type="password" autoComplete="off" spellCheck={false} value={youtubeApiKey} onChange={(e) => setYoutubeApiKey(e.target.value)} placeholder="Paste your YouTube API key" />
+              <p className="integration-help">Create it in <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">Google Cloud Credentials</a> and restrict it to YouTube Data API v3. Never commit the key to the repository.</p>
+            </div>
+            <div className="integration-card">
+              <div className="integration-title"><Icon name="spotify" size={20} /><div><h3>Spotify Web API</h3><p>Client ID for the Spotify sign-in flow.</p></div><span className={spotifyClientId.trim() ? "integration-status configured" : "integration-status"}>{spotifyClientId.trim() ? "ID ADDED" : "NOT SET"}</span></div>
+              <label className="integration-label">Client ID</label>
+              <input className="credential-input" type="text" autoComplete="off" spellCheck={false} value={spotifyClientId} onChange={(e) => setSpotifyClientId(e.target.value)} placeholder="Paste your Spotify Client ID" />
+              <p className="integration-help">Get it from the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify Developer Dashboard</a>. A desktop app should use OAuth PKCE; do not enter or store a Client Secret here.</p>
+            </div>
+            <div className="integration-actions"><button className="integration-save" disabled={!credentialsLoaded} onClick={saveIntegrations}>Save credentials</button><button className="settings" onClick={() => { setYoutubeApiKey(""); setSpotifyClientId(""); }}>Clear fields</button></div>
+            <p className="integration-footnote">This phase adds local credential fields only. YouTube search and Spotify OAuth still need to be connected in the next integration step.</p>
+          </section>}
+          {!showSettings && active === "Search" && <section className="search-page">
             <div className="search-topline"><div><span className="kicker">DISCOVER SOMETHING NEW</span><h2>Search music</h2></div><span className="search-provider-label">{searchProvider === "Spotify" ? "SPOTIFY" : "YOUTUBE"}</span></div>
             <div className="search-workspace">
               <div className="provider-switch" data-provider={searchProvider} role="group" aria-label="Search provider"><span className="provider-slider" aria-hidden="true" /><button className={searchProvider === "YouTube" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("YouTube")} aria-pressed={searchProvider === "YouTube"}><Icon name="youtube" size={16} /><span>YouTube</span></button><button className={searchProvider === "Spotify" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("Spotify")} aria-pressed={searchProvider === "Spotify"}><Icon name="spotify" size={16} /><span>Spotify</span></button></div>
@@ -222,9 +269,9 @@ function App() {
               <p className="search-note">These are sample results for the UI only — no streaming or catalog search is connected yet.</p>
             </div>}
           </section>}
-          {active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
+          {!showSettings && active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
 
-          <div className="now-playing-layout">
+          {!showSettings && <div className="now-playing-layout">
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
               <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>
