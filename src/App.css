@@ -98,6 +98,7 @@ nav { display:grid; gap:3px; }
 .status { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 2px; color: #6fae89; font: 9px ui-monospace, monospace; display: inline-flex; align-items: center; gap: 6px; }
 .status i { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: currentColor; }
 .status b { width: 1px; height: 10px; margin: 0 2px; background: #394047; font-size: 0; }
+.spectrum-canvas { position: absolute; inset: 0 8px 27px; width: calc(100% - 16px); height: calc(100% - 27px); display: block; }
 .spectrum { height: 150px; position: relative; overflow: hidden; border-top: 1px solid #30343a; border-bottom: 1px solid #30343a; background: #17191d; }
 .spectrum-bars { position: absolute; inset: 18px 8px 27px; display: flex; align-items: center; gap: 5px; pointer-events: none; }
 .spectrum-bars i { flex: 1; min-width: 2px; max-width: 9px; margin: 0 auto; border-radius: 1px 1px 0 0; background: var(--accent); opacity: .7; animation: spectrum 1s ease-in-out infinite alternate; }
