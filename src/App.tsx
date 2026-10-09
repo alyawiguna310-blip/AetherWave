@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
 import { startCapture, stopCapture } from "tauri-plugin-wasapi-api";
 import "./App.css";
 
