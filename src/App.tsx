@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
