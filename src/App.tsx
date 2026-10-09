@@ -72,6 +72,7 @@ function App() {
   const [youtubeError, setYoutubeError] = useState("");
   const [selectedYouTubeVideo, setSelectedYouTubeVideo] = useState<YouTubeVideo | null>(null);
   const [youtubeIsPlaying, setYoutubeIsPlaying] = useState(false);
+  const [showYouTubeVideo, setShowYouTubeVideo] = useState(false);
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -228,8 +229,9 @@ function App() {
         for (let i = 0; i < count; i++) {
           const bin = data[Math.floor(i * data.length / count)] / 255;
           const idle = 0.035 + Math.abs(Math.sin(i * 0.43) * 0.07 + Math.sin(i * 0.16) * 0.04);
-          const isActive = !audio.paused && Boolean(audio.currentSrc);
-          const level = isActive ? bin : idle;
+          const isActive = selectedYouTubeVideo ? youtubeIsPlaying : !audio.paused && Boolean(audio.currentSrc);
+          const youtubePulse = 0.12 + Math.abs(Math.sin(Date.now() / 180 + i * 0.43)) * 0.62 + Math.abs(Math.sin(Date.now() / 310 + i * 0.16)) * 0.18;
+          const level = selectedYouTubeVideo && youtubeIsPlaying ? Math.min(1, youtubePulse) : isActive ? bin : idle;
           const barHeight = Math.max(3 * dpr, level * height * 0.88);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
@@ -252,7 +254,7 @@ function App() {
       window.cancelAnimationFrame(frame);
       // Keep the single audio graph alive across StrictMode effect replays.
     };
-  }, []);
+  }, [selectedYouTubeVideo, youtubeIsPlaying]);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
@@ -328,9 +330,9 @@ function App() {
             <div className="integration-actions"><button className="integration-save" disabled={!credentialsLoaded} onClick={saveIntegrations}>Save credentials</button><button className="settings" onClick={() => { setYoutubeApiKey(""); setSpotifyClientId(""); }}>Clear fields</button></div>
             <p className="integration-footnote">YouTube search is connected to the key saved on this device. Spotify is paused for now. Restrict the API key in Google Cloud and never commit it to GitHub.</p>
           </section>}
-          {selectedYouTubeVideo && <section className="youtube-player-panel persistent-youtube-player" aria-label="Persistent YouTube player">
-            <div className="youtube-player-frame"><iframe ref={youtubeIframeRef} key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={() => { const iframe = youtubeIframeRef.current; if (iframe?.contentWindow) iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com"); }} /></div>
-            <div className="youtube-player-caption"><b>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => { setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setPlaying(false); setMessage("YouTube playback stopped"); }}>Close player</button></div>
+          {selectedYouTubeVideo && <section className="youtube-player-panel persistent-youtube-player" aria-label="YouTube player">
+            <div className="youtube-player-caption"><b title={selectedYouTubeVideo.snippet.title}>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => setShowYouTubeVideo((value) => !value)}>{showYouTubeVideo ? "Hide video" : "Show video"}</button><button className="settings" onClick={() => { setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setShowYouTubeVideo(false); setPlaying(false); setMessage("YouTube playback stopped"); }}>Close</button></div>
+            {showYouTubeVideo && <div className="youtube-player-frame"><iframe ref={youtubeIframeRef} key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={() => { const iframe = youtubeIframeRef.current; if (iframe?.contentWindow) iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com"); }} />}</div>}
           </section>}
 
           {!showSettings && active === "Search" && <section className="search-page">
@@ -361,11 +363,11 @@ function App() {
           {!showSettings && <div className="now-playing-layout">
           <section className="now-playing">
             <div className="cover" style={{ background: current.accent }}>
-              <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>
+              {selectedYouTubeVideo ? <img className="cover-artwork" src={selectedYouTubeVideo.snippet.thumbnails?.high?.url ?? selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt={`${selectedYouTubeVideo.snippet.title} thumbnail`} /> : <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>}
             </div>
             <div className="now-info">
               <span className="kicker">NOW PLAYING</span>
-              <h2>{current.title}</h2>
+              <h2 title={current.title}>{current.title}</h2>
               <p>{current.artist} <span>·</span> {current.album}</p>
               <div className="format-line"><span>{current.url ? "LOCAL" : "DEMO"}</span><span>{current.url ? "FILE" : "24 bit"}</span><span>{current.url ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : "44.1 kHz"}</span></div>
               <div className="action-row">
@@ -411,7 +413,7 @@ function App() {
 
       <footer className="player">
         <audio ref={audioRef} preload="metadata" onLoadedMetadata={(e) => { const duration = e.currentTarget.duration; setLocalTracks((items) => items.map((item, i) => i === track ? { ...item, duration: formatTime(duration) } : item)); }} onTimeUpdate={(e) => { const time = e.currentTarget.currentTime; const duration = e.currentTarget.duration; setCurrentTime(time); setProgress(duration ? (time / duration) * 100 : 0); }} onEnded={next} />
-        <div className="player-song"><div className="mini-cover" style={{ background: current.accent }}>A</div><div><b>{current.title}</b><small>{current.artist}</small></div></div>
+        <div className="player-song">{selectedYouTubeVideo ? <img className="mini-cover thumbnail-cover" src={selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt="" /> : <div className="mini-cover" style={{ background: current.accent }}>A</div>}<div><b title={current.title}>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
           <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => { const nextPlaying = !playing; setPlaying(nextPlaying); if (selectedYouTubeVideo) setYoutubeIsPlaying(nextPlaying); }}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
           <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{current.duration}</span></div>
