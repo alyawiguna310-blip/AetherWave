@@ -23,21 +23,11 @@ pub struct WallpaperItem {
 fn decode_vdf_paths(content: &str) -> Vec<PathBuf> {
     // libraryfolders.vdf stores library paths in quoted key/value pairs.
     let mut paths = Vec::new();
-    let mut expect_path = false;
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("\"path\"") {
-            if let Some((_, value)) = trimmed.split_once('"') {
-                let value = value.trim_start_matches("path").trim_start();
-                if let Some(start) = value.find('"') {
-                    let rest = &value[start + 1..];
-                    if let Some(end) = rest.find('"') {
-                        paths.push(PathBuf::from(rest[..end].replace("\\\\", "\\")));
-                    }
-                }
-            }
-        } else if trimmed.starts_with("\"") && trimmed.contains("\"") && expect_path {
-            // Older VDF format is handled by the path key above.
+        let fields: Vec<&str> = trimmed.split('"').collect();
+        if fields.len() >= 5 && fields[1] == "path" {
+            paths.push(PathBuf::from(fields[3].replace("\\\\", "\\")));
         }
         expect_path = false;
     }
