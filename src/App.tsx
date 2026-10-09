@@ -237,76 +237,94 @@ function App() {
   }, [playing, current.url]);
 
   useEffect(() => {
-    const audio = audioRef.current;
     const canvas = spectrumCanvasRef.current;
-    if (!audio || !canvas) return;
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
+    if (!canvas) return;
 
-    // React StrictMode re-runs effects in development. Reuse the existing
-    // MediaElementAudioSourceNode because an audio element can only have one.
-    let context = audioContextRef.current;
+    const audio = audioRef.current;
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     let analyser = analyserRef.current;
-    let source = sourceRef.current;
-    if (!context || !analyser || !source) {
-      context = new AudioContextClass();
-      analyser = context.createAnalyser();
-      analyser.fftSize = 128;
-      analyser.smoothingTimeConstant = 0.82;
-      source = context.createMediaElementSource(audio);
-      source.connect(analyser);
-      analyser.connect(context.destination);
-      audioContextRef.current = context;
-      analyserRef.current = analyser;
-      sourceRef.current = source;
+
+    // The YouTube player is cross-origin, so use an animated approximation for it.
+    // Local files use Web Audio when the browser supports it; failure to create an
+    // analyser must never prevent the canvas visualizer from drawing.
+    if (audio && AudioContextClass && !analyserRef.current) {
+      try {
+        const context = audioContextRef.current ?? new AudioContextClass();
+        const source = sourceRef.current ?? context.createMediaElementSource(audio);
+        analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.78;
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        audioContextRef.current = context;
+        sourceRef.current = source;
+        analyserRef.current = analyser;
+      } catch (error) {
+        console.warn("AetherWave spectrum analyser unavailable; using visual fallback.", error);
+        analyser = null;
+      }
     }
 
+    let frame = 0;
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
       const width = Math.max(1, Math.floor(rect.width * dpr));
       const height = Math.max(1, Math.floor(rect.height * dpr));
+
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
       }
+
       const ctx = canvas.getContext("2d");
-      if (ctx) {
+      if (ctx && rect.width > 0 && rect.height > 0) {
         ctx.clearRect(0, 0, width, height);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        const count = 64;
+        const data = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+        if (analyser && data) {
+          try {
+            analyser.getByteFrequencyData(data);
+          } catch {
+            // Keep rendering the fallback bars if Web Audio becomes unavailable.
+          }
+        }
+
+        const count = 56;
         const gap = Math.max(2 * dpr, width * 0.004);
-        const barWidth = (width - gap * (count - 1)) / count;
+        const barWidth = Math.max(1, (width - gap * (count - 1)) / count);
+        const isYouTubeActive = Boolean(selectedYouTubeVideo && youtubeIsPlaying);
+        const isLocalActive = Boolean(!selectedYouTubeVideo && playing && audio && !audio.paused && audio.currentSrc);
+        const isActive = isYouTubeActive || isLocalActive;
+        const styleTarget = document.querySelector(".app") ?? canvas;
+        const accent = getComputedStyle(styleTarget).getPropertyValue("--accent").trim() || "#8b7cff";
+        const now = performance.now();
+
         for (let i = 0; i < count; i++) {
-          const bin = data[Math.floor(i * data.length / count)] / 255;
-          const idle = 0.035 + Math.abs(Math.sin(i * 0.43) * 0.07 + Math.sin(i * 0.16) * 0.04);
-          const isActive = selectedYouTubeVideo ? youtubeIsPlaying : !audio.paused && Boolean(audio.currentSrc);
-          const youtubePulse = 0.12 + Math.abs(Math.sin(Date.now() / 180 + i * 0.43)) * 0.62 + Math.abs(Math.sin(Date.now() / 310 + i * 0.16)) * 0.18;
-          const level = selectedYouTubeVideo && youtubeIsPlaying ? Math.min(1, youtubePulse) : isActive ? bin : idle;
-          const barHeight = Math.max(3 * dpr, level * height * 0.88);
+          const bin = data ? (data[Math.min(data.length - 1, Math.floor(i * data.length / count))] / 255) : 0;
+          const idle = 0.025 + Math.abs(Math.sin(i * 0.43) * 0.045 + Math.sin(i * 0.16) * 0.025);
+          const pulse = 0.10
+            + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54
+            + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
+          const level = isYouTubeActive ? Math.min(1, pulse) : isLocalActive && data ? bin : idle;
+          const barHeight = Math.max(2 * dpr, level * height * 0.86);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
           const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-          const accent = getComputedStyle(document.querySelector(".app") ?? canvas).getPropertyValue("--accent").trim() || "#8b7cff";
           gradient.addColorStop(0, accent);
           gradient.addColorStop(1, accent + "55");
           ctx.fillStyle = gradient;
-          ctx.globalAlpha = isActive ? 0.95 : 0.52;
-          ctx.beginPath();
-          ctx.roundRect(x, y, barWidth, barHeight, Math.min(3 * dpr, barWidth / 2));
-          ctx.fill();
+          ctx.globalAlpha = isActive ? 0.95 : 0.5;
+          ctx.fillRect(x, y, barWidth, barHeight);
         }
         ctx.globalAlpha = 1;
       }
+
       frame = window.requestAnimationFrame(draw);
     };
-    let frame = window.requestAnimationFrame(draw);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      // Keep the single audio graph alive across StrictMode effect replays.
-    };
-  }, [selectedYouTubeVideo, youtubeIsPlaying]);
+
+    frame = window.requestAnimationFrame(draw);
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url]);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
