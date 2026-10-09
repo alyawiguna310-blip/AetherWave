@@ -474,7 +474,7 @@ function App() {
 
       <div className="layout">
         <aside className="sidebar">
-          <div className="nav-label">NAVIGATION <span className="nav-count">4</span></div>
+          <div className="nav-label">NAVIGATION <span className="nav-count">5</span></div>
           <nav>
             {navItems.map(({ name, icon }) => (
               <button key={name} className={active === name ? "nav-link active" : "nav-link"} onClick={() => setActive(name)}>
@@ -609,6 +609,8 @@ function App() {
             )}
           </section>}
 
+          {!showSettings && active === "Wallpaper" && <WallpaperEnginePage />}
+
           {!showSettings && active === "Library" && !localTracks.length && (
             <section className="download-empty">
               <div className="download-icon"><Icon name="download" size={22} /></div>
@@ -616,7 +618,7 @@ function App() {
             </section>
           )}
 
-          {!showSettings && (
+          {!showSettings && active !== "Wallpaper" && (
             <div className="now-playing-layout">
               <section className="now-playing">
                 <div className="cover" style={{ background: current.accent }}>
@@ -678,7 +680,7 @@ function App() {
             </div>
           )}
 
-          {!showSettings && (
+          {!showSettings && active !== "Wallpaper" && (
             <section className="queue">
               <div className="panel-heading">
                 <div><span className="kicker">PLAYBACK QUEUE</span><h3>Up next</h3></div>
