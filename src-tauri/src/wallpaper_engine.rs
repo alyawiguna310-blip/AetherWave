@@ -194,8 +194,9 @@ fn scan_items() -> Vec<WallpaperItem> {
             let preview = preview_file(&folder);
             let video = find_video(&folder);
             let image = find_image(&folder);
+            let is_image_wallpaper = type_hint.contains("image") || (type_hint == "unknown" && video.is_none() && image.is_some());
             let kind = if type_hint.contains("video") || (type_hint == "unknown" && video.is_some()) { "video" }
-                else if type_hint.contains("image") { "image" }
+                else if is_image_wallpaper { "image" }
                 else if type_hint.contains("scene") { "scene" }
                 else if type_hint.contains("web") { "web" }
                 else if type_hint.contains("application") { "application" }
@@ -203,7 +204,7 @@ fn scan_items() -> Vec<WallpaperItem> {
             items.push(WallpaperItem {
                 id, title, description, kind: kind.to_string(),
                 preview_path: preview.map(|p| p.to_string_lossy().into_owned()),
-                image_path: if type_hint.contains("image") { image.map(|p| p.to_string_lossy().into_owned()) } else { None },
+                image_path: if is_image_wallpaper { image.map(|p| p.to_string_lossy().into_owned()) } else { None },
                 video_path: video.map(|p| p.to_string_lossy().into_owned()),
                 has_audio_hint,
                 audio_note: if has_audio_hint {
