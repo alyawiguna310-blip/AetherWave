@@ -415,6 +415,14 @@ function App() {
         const styleTarget = document.querySelector(".app") ?? canvas;
         const accent = getComputedStyle(styleTarget).getPropertyValue("--accent").trim() || "#8b7cff";
         const now = performance.now();
+        ctx.strokeStyle = "#ffffff0c";
+        ctx.lineWidth = 1 * dpr;
+        for (let line = 1; line <= 3; line++) {
+          const gridY = (height - 24 * dpr) - (height - 30 * dpr) * (line / 4);
+          ctx.beginPath(); ctx.moveTo(0, gridY); ctx.lineTo(width, gridY); ctx.stroke();
+        }
+        ctx.fillStyle = "#ffffff18";
+        ctx.fillRect(0, height - 24 * dpr, width, 1 * dpr);
         for (let i = 0; i < count; i++) {
           const idle = 0.025 + Math.abs(Math.sin(i * 0.43) * 0.045 + Math.sin(i * 0.16) * 0.025);
           const pulse = 0.10 + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54 + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
@@ -423,18 +431,22 @@ function App() {
           const level = prior + (target - prior) * (target > prior ? 0.42 : 0.16);
           smoothedBins[i] = level;
           peakBins[i] = Math.max(level, (peakBins[i] ?? 0) - 0.006);
-          const barHeight = Math.max(2 * dpr, level * height * 0.82);
+          const usableHeight = Math.max(1, height - 30 * dpr);
+          const barHeight = Math.max(2 * dpr, level * usableHeight * 0.9);
           const x = i * (barWidth + gap);
-          const y = (height - barHeight) / 2;
+          const y = height - 24 * dpr - barHeight;
           const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
           gradient.addColorStop(0, accent);
-          gradient.addColorStop(1, accent + "55");
+          gradient.addColorStop(1, accent + "22");
           ctx.fillStyle = gradient;
-          ctx.globalAlpha = isActive ? 0.95 : 0.5;
+          ctx.globalAlpha = isActive ? 0.96 : 0.42;
+          ctx.shadowColor = accent;
+          ctx.shadowBlur = isActive ? 8 * dpr : 0;
           ctx.fillRect(x, y, barWidth, barHeight);
+          ctx.shadowBlur = 0;
           if (isActive && peakBins[i] > 0.025) {
-            const peakY = (height - Math.max(2 * dpr, peakBins[i] * height * 0.82)) / 2;
-            ctx.globalAlpha = 0.72;
+            const peakY = height - 24 * dpr - peakBins[i] * usableHeight * 0.9;
+            ctx.globalAlpha = 0.85;
             ctx.fillStyle = accent;
             ctx.fillRect(x, Math.max(0, peakY - 1.5 * dpr), barWidth, 1.5 * dpr);
           }
