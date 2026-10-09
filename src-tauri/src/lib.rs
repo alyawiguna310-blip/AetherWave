@@ -1,3 +1,5 @@
+mod system_audio;
+
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use serde::Serialize;
 use std::{
@@ -244,8 +246,8 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_wasapi::init())
         .manage(AudioState::default())
+        .manage(system_audio::SystemCaptureState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             pick_audio_files,
@@ -255,7 +257,9 @@ pub fn run() {
             stop_audio,
             set_volume,
             seek_audio,
-            get_playback_state
+            get_playback_state,
+            system_audio::start_system_audio,
+            system_audio::stop_system_audio
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");

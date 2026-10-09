@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { startCapture, stopCapture } from "./wasapi-api";
+import {
+  BAR_COUNT,
+  LevelSmoother,
+  SYSTEM_FFT_SIZE,
+  SimulatedSpectrum,
+  analyserToBars,
+  calculateSystemSpectrum,
+  drawBars,
+  drawCircle,
+  drawWave,
+  idleLevels,
+} from "./lib/visualizer";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
@@ -55,203 +67,6 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
   return <svg {...p}><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
 }
 
-const SYSTEM_FFT_SIZE = 2048;
-
-function calculateSystemSpectrum(buffer: Float32Array, writeIndex: number): number[] {
-  const size = SYSTEM_FFT_SIZE;
-  const real = new Float32Array(size);
-  const imag = new Float32Array(size);
-  for (let i = 0; i < size; i++) {
-    const sample = buffer[(writeIndex + i) % size] ?? 0;
-    const hann = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
-    real[i] = sample * hann;
-  }
-  let j = 0;
-  for (let i = 1; i < size; i++) {
-    let bit = size >> 1;
-    while (j & bit) { j ^= bit; bit >>= 1; }
-    j ^= bit;
-    if (i < j) {
-      [real[i], real[j]] = [real[j], real[i]];
-      [imag[i], imag[j]] = [imag[j], imag[i]];
-    }
-  }
-  for (let length = 2; length <= size; length <<= 1) {
-    const angle = (-2 * Math.PI) / length;
-    const stepReal = Math.cos(angle);
-    const stepImag = Math.sin(angle);
-    for (let start = 0; start < size; start += length) {
-      let wr = 1, wi = 0;
-      const half = length >> 1;
-      for (let k = 0; k < half; k++) {
-        const even = start + k, odd = even + half;
-        const tr = wr * real[odd] - wi * imag[odd];
-        const ti = wr * imag[odd] + wi * real[odd];
-        real[odd] = real[even] - tr; imag[odd] = imag[even] - ti;
-        real[even] += tr; imag[even] += ti;
-        const nextWr = wr * stepReal - wi * stepImag;
-        wi = wr * stepImag + wi * stepReal; wr = nextWr;
-      }
-    }
-  }
-  const bars: number[] = [];
-  const sampleRate = 16000;
-  for (let bar = 0; bar < 56; bar++) {
-    const lowHz = 35 * Math.pow(8000 / 35, bar / 56);
-    const highHz = 35 * Math.pow(8000 / 35, (bar + 1) / 56);
-    const first = Math.max(1, Math.floor((lowHz * size) / sampleRate));
-    const last = Math.min(size / 2, Math.max(first + 1, Math.ceil((highHz * size) / sampleRate)));
-    let power = 0, bins = 0;
-    for (let bin = first; bin < last; bin++) { power += real[bin] * real[bin] + imag[bin] * imag[bin]; bins++; }
-    const magnitude = bins ? Math.sqrt(power / bins) / size : 0;
-    bars.push(Math.min(1, Math.sqrt(magnitude * 28)));
-  }
-  return bars;
-}
-
-// Generates a music-shaped fake spectrum for YouTube (cross-origin, can't tap real audio).
-// Uses multiple overlapping sine waves at different tempos to mimic bass/mid/treble energy.
-function getFakeSpectrum(now: number, barCount: number): number[] {
-  const beat = (now / 1000) % 1;
-  const beatPulse = Math.pow(Math.max(0, 1 - beat * 3.5), 1.8) * 0.55;
-  const bars: number[] = [];
-  for (let i = 0; i < barCount; i++) {
-    const t = i / barCount;
-    // Bass hump (left), mid bump, treble taper
-    const bassShape = Math.exp(-Math.pow((t - 0.08) / 0.12, 2)) * (0.65 + beatPulse * 0.9);
-    const midShape = Math.exp(-Math.pow((t - 0.38) / 0.18, 2)) * 0.4;
-    const trebleShape = Math.exp(-Math.pow((t - 0.72) / 0.14, 2)) * 0.18;
-    const shimmer =
-      Math.abs(Math.sin(now / 290 + i * 0.55)) * 0.22 +
-      Math.abs(Math.sin(now / 480 + i * 0.27)) * 0.14 +
-      Math.abs(Math.sin(now / 130 + i * 0.9)) * 0.08;
-    const level = Math.min(1, (bassShape + midShape + trebleShape) * (0.55 + shimmer));
-    bars.push(Math.max(0.02, level));
-  }
-  return bars;
-}
-
-// Draw bars visualizer
-function drawBars(ctx: CanvasRenderingContext2D, width: number, height: number, levels: number[], accent: string, dpr: number, active: boolean) {
-  const count = levels.length;
-  const gap = Math.max(2 * dpr, width * 0.004);
-  const barWidth = Math.max(1, (width - gap * (count - 1)) / count);
-  for (let i = 0; i < count; i++) {
-    const level = levels[i];
-    const barHeight = Math.max(2 * dpr, level * height * 0.86);
-    const x = i * (barWidth + gap);
-    const y = (height - barHeight) / 2;
-    const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-    gradient.addColorStop(0, accent);
-    gradient.addColorStop(0.5, accent + "bb");
-    gradient.addColorStop(1, accent + "44");
-    ctx.fillStyle = gradient;
-    ctx.globalAlpha = active ? 0.92 : 0.38;
-    // Rounded top cap
-    ctx.beginPath();
-    const r = Math.min(barWidth / 2, 3 * dpr);
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + barWidth - r, y);
-    ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + r);
-    ctx.lineTo(x + barWidth, y + barHeight - r);
-    ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - r, y + barHeight);
-    ctx.lineTo(x + r, y + barHeight);
-    ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.fill();
-    // Reflection glow at bottom
-    if (active) {
-      const glowH = Math.max(2 * dpr, level * height * 0.12);
-      const gx = ctx.createLinearGradient(0, height, 0, height - glowH);
-      gx.addColorStop(0, accent + "22");
-      gx.addColorStop(1, "transparent");
-      ctx.fillStyle = gx;
-      ctx.globalAlpha = 0.45;
-      ctx.fillRect(x, height - glowH, barWidth, glowH);
-    }
-  }
-  ctx.globalAlpha = 1;
-}
-
-// Draw waveform visualizer
-function drawWave(ctx: CanvasRenderingContext2D, width: number, height: number, levels: number[], accent: string, active: boolean) {
-  const points = levels.length;
-  const centerY = height / 2;
-  ctx.lineWidth = active ? 2.2 : 1.2;
-  ctx.strokeStyle = accent;
-  ctx.globalAlpha = active ? 0.88 : 0.32;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = active ? 8 : 0;
-  ctx.beginPath();
-  for (let i = 0; i < points; i++) {
-    const x = (i / (points - 1)) * width;
-    const amp = (levels[i] - 0.5) * height * 0.72;
-    if (i === 0) ctx.moveTo(x, centerY + amp);
-    else ctx.lineTo(x, centerY + amp);
-  }
-  ctx.stroke();
-  // Mirror
-  ctx.globalAlpha = active ? 0.28 : 0.1;
-  ctx.beginPath();
-  for (let i = 0; i < points; i++) {
-    const x = (i / (points - 1)) * width;
-    const amp = (levels[i] - 0.5) * height * 0.72;
-    if (i === 0) ctx.moveTo(x, centerY - amp);
-    else ctx.lineTo(x, centerY - amp);
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 1;
-}
-
-// Draw circular visualizer
-function drawCircle(ctx: CanvasRenderingContext2D, width: number, height: number, levels: number[], accent: string, active: boolean, now: number) {
-  const cx = width / 2, cy = height / 2;
-  const maxR = Math.min(cx, cy) * 0.82;
-  const baseR = maxR * 0.38;
-  const count = levels.length;
-  ctx.globalAlpha = active ? 0.9 : 0.3;
-  // Rotating glow ring
-  const spin = (now / 4000) * Math.PI * 2;
-  const grd = ctx.createRadialGradient(cx, cy, baseR * 0.8, cx, cy, maxR);
-  grd.addColorStop(0, accent + "18");
-  grd.addColorStop(1, "transparent");
-  ctx.fillStyle = grd;
-  ctx.beginPath();
-  ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-  ctx.fill();
-  // Bars around circle
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2 - Math.PI / 2 + spin * 0.08;
-    const level = levels[i];
-    const barLen = level * (maxR - baseR) * 0.95;
-    const x1 = cx + Math.cos(angle) * baseR;
-    const y1 = cy + Math.sin(angle) * baseR;
-    const x2 = cx + Math.cos(angle) * (baseR + barLen);
-    const y2 = cy + Math.sin(angle) * (baseR + barLen);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = Math.max(1.2, (Math.PI * 2 * baseR / count) * 0.55);
-    ctx.lineCap = "round";
-    ctx.globalAlpha = active ? (0.5 + level * 0.5) : 0.2;
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = active ? level * 10 : 0;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-  // Center dot
-  ctx.shadowBlur = active ? 16 : 0;
-  ctx.globalAlpha = active ? 0.85 : 0.25;
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.arc(cx, cy, baseR * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 1;
-}
-
 function App() {
   const [active, setActive] = useState<(typeof navItems)[number]["name"]>("Home");
   const [searchProvider, setSearchProvider] = useState<"YouTube" | "Spotify">("YouTube");
@@ -281,6 +96,9 @@ function App() {
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false);
   const systemSpectrumRef = useRef<number[]>([]);
   const [visMode, setVisMode] = useState<VisMode>("bars");
+  // Kept in refs so smoothing state survives the render-loop effect restarting.
+  const smootherRef = useRef(new LevelSmoother());
+  const simulatedRef = useRef(new SimulatedSpectrum());
 
   useEffect(() => {
     try {
@@ -328,9 +146,9 @@ function App() {
             }
             systemAudioWriteRef.current = write;
             // WASAPI can deliver chunks faster than the visualizer needs. Limit FFT
-            // work to ~30 Hz instead of recalculating the spectrum for every chunk.
+            // work to ~60 Hz instead of recalculating the spectrum for every chunk.
             const now = performance.now();
-            if (now - lastSpectrumUpdateRef.current >= 1000 / 30) {
+            if (now - lastSpectrumUpdateRef.current >= 1000 / 60) {
               systemSpectrumRef.current = calculateSystemSpectrum(ring, write);
               lastSpectrumUpdateRef.current = now;
             }
@@ -355,6 +173,17 @@ function App() {
   useEffect(() => () => {
     void stopCapture("system-audio").catch(() => {});
   }, []);
+
+  // A YouTube iframe's audio can't be analysed, so the only way to sync with it is
+  // to listen to what the speakers play. Try that once automatically; if it fails
+  // (or the user turns it off) we fall back to the simulated spectrum.
+  const autoSystemTriedRef = useRef(false);
+  useEffect(() => {
+    if (!youtubeIsPlaying || systemAudioEnabled || autoSystemTriedRef.current) return;
+    autoSystemTriedRef.current = true;
+    void toggleSystemAudioCapture();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [youtubeIsPlaying, systemAudioEnabled]);
 
   const saveIntegrations = () => {
     try {
@@ -490,8 +319,8 @@ function App() {
         const context = audioContextRef.current ?? new AudioContextClass();
         const source = sourceRef.current ?? context.createMediaElementSource(audio);
         analyser = context.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.82;
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.5; // extra smoothing is done by LevelSmoother
         source.connect(analyser);
         analyser.connect(context.destination);
         audioContextRef.current = context;
@@ -507,14 +336,19 @@ function App() {
     const frequencyData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
     let frame = 0;
     let lastDrawTime = 0;
-    const FRAME_INTERVAL = 1000 / 30;
-    const COUNT = 56;
+    const FRAME_INTERVAL = 1000 / 60;
+    const COUNT = BAR_COUNT;
+    const smoother = smootherRef.current;
+    const simulated = simulatedRef.current;
+    const rawLevels: number[] = new Array(COUNT).fill(0);
+    simulated.setSeed(selectedYouTubeVideo?.id.videoId ?? "");
 
     const draw = (timestamp: number) => {
-      if (timestamp - lastDrawTime < FRAME_INTERVAL) {
+      if (timestamp - lastDrawTime < FRAME_INTERVAL - 1) {
         frame = window.requestAnimationFrame(draw);
         return;
       }
+      const dt = lastDrawTime ? (timestamp - lastDrawTime) / 1000 : 1 / 60;
       lastDrawTime = timestamp;
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -528,8 +362,6 @@ function App() {
 
       ctx.clearRect(0, 0, width, height);
 
-      // The effect restarts when the current track accent changes, so this
-      // value does not need to be recomputed on every animation frame.
       const accent = current.accent || "#8b7cff";
       const now = timestamp;
 
@@ -537,39 +369,32 @@ function App() {
       const hasSystemSpectrum = systemAudioEnabled && systemBins.length === COUNT;
       const isYouTubeActive = Boolean(selectedYouTubeVideo && youtubeIsPlaying);
       const isLocalActive = Boolean(!selectedYouTubeVideo && playing && audio && !audio.paused && audio.currentSrc);
-      const isActive = hasSystemSpectrum ? systemBins.some((v) => v > 0.025) : isYouTubeActive || isLocalActive;
 
-      // Build levels array
-      let levels: number[];
+      // Pick the raw (unsmoothed) target levels for this frame.
+      let target: ArrayLike<number>;
       if (hasSystemSpectrum) {
-        levels = systemBins;
+        target = systemBins;
       } else if (isLocalActive && analyser && frequencyData) {
         try { analyser.getByteFrequencyData(frequencyData); } catch { /* ignore */ }
-        levels = Array.from({ length: COUNT }, (_, i) =>
-          (frequencyData[Math.min(frequencyData.length - 1, Math.floor(i * frequencyData.length / COUNT))] / 255)
-        );
+        target = analyserToBars(frequencyData, analyser.context.sampleRate, COUNT, rawLevels);
       } else if (isYouTubeActive) {
-        // Good-looking fake spectrum shaped like real music
-        levels = getFakeSpectrum(now, COUNT);
+        target = simulated.frame(now);   // YouTube iframe audio can't be analysed
       } else {
-        // Idle: very subtle breathing animation
-        const idleLevels: number[] = [];
-        for (let i = 0; i < COUNT; i++) {
-          const base = 0.018 + Math.abs(Math.sin(i * 0.43) * 0.022 + Math.sin(i * 0.16) * 0.012);
-          const breathe = base + Math.abs(Math.sin(now / 2200 + i * 0.3)) * 0.028;
-          idleLevels.push(breathe);
-        }
-        levels = idleLevels;
+        target = idleLevels(now, rawLevels);
       }
 
-      // Draw the selected visualizer mode
+      smoother.update(target, dt);
+      const isActive = hasSystemSpectrum
+        ? systemBins.some((v) => v > 0.05)
+        : isYouTubeActive || isLocalActive;
+
       const currentVisMode = (canvas as HTMLCanvasElement & { _visMode?: VisMode })._visMode ?? "bars";
       if (currentVisMode === "wave") {
-        drawWave(ctx, width, height, levels, accent, isActive);
+        drawWave(ctx, width, height, smoother.levels, accent, isActive, now);
       } else if (currentVisMode === "circle") {
-        drawCircle(ctx, width, height, levels, accent, isActive, now);
+        drawCircle(ctx, width, height, smoother.levels, accent, isActive, now);
       } else {
-        drawBars(ctx, width, height, levels, accent, dpr, isActive);
+        drawBars(ctx, width, height, smoother.levels, smoother.peaks, accent, dpr, isActive);
       }
 
       frame = window.requestAnimationFrame(draw);
@@ -643,7 +468,6 @@ function App() {
             <span><strong>Music</strong><small>Local session</small></span>
           </a>
         </div>
-        <div className="window-actions" aria-hidden="true"><span /><span /><span /></div>
       </header>
 
       <div className="layout">
@@ -666,7 +490,7 @@ function App() {
           </div>
 
           <div className="sidebar-footer">
-            <div><span>Library</span><b>128 tracks</b></div>
+            <div><span>Library</span><b>{localTracks.length} {localTracks.length === 1 ? "track" : "tracks"}</b></div>
             <div><span>Engine</span><b className="ready">Ready</b></div>
           </div>
         </aside>
@@ -795,7 +619,7 @@ function App() {
               <section className="now-playing">
                 <div className="cover" style={{ background: current.accent }}>
                   {selectedYouTubeVideo
-                    ? <img className="cover-artwork" src={selectedYouTubeVideo.snippet.thumbnails?.high?.url ?? selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt={`${selectedYouTubeVideo.snippet.title} thumbnail`} />
+                    ? <img className={`cover-artwork${selectedYouTubeVideo.snippet.thumbnails?.high?.url ? " letterboxed" : ""}`} src={selectedYouTubeVideo.snippet.thumbnails?.high?.url ?? selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt={`${selectedYouTubeVideo.snippet.title} thumbnail`} />
                     : <div className="cover-inner"><span className="cover-name">AETHER</span><span className="cover-title">WAVE</span></div>}
                 </div>
                 <div className="now-info">
@@ -805,7 +629,7 @@ function App() {
                   <div className="format-line">
                     <span>{current.url ? "LOCAL" : selectedYouTubeVideo ? "YT" : "DEMO"}</span>
                     <span>{current.url ? "FILE" : selectedYouTubeVideo ? "STREAM" : "24 bit"}</span>
-                    <span>{current.url ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : selectedYouTubeVideo ? "720p" : "44.1 kHz"}</span>
+                    {!(selectedYouTubeVideo && !current.url) && <span>{current.url ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : "44.1 kHz"}</span>}
                   </div>
                   <div className="action-row">
                     <button className="play-button" onClick={() => { const n = !playing; setPlaying(n); if (selectedYouTubeVideo) setYoutubeIsPlaying(n); }}>
@@ -825,7 +649,7 @@ function App() {
                       {systemAudioEnabled
                         ? <><i className="vis-dot vis-dot--system" />SYSTEM AUDIO</>
                         : isYouTubeActiveHere(playing, selectedYouTubeVideo, youtubeIsPlaying)
-                          ? <><i className="vis-dot vis-dot--yt" />YOUTUBE · simulated</>
+                          ? <><i className="vis-dot vis-dot--yt" />YOUTUBE · simulated, not synced</>
                           : playing
                             ? <><i className="vis-dot vis-dot--local" />LOCAL AUDIO</>
                             : <><i className="vis-dot vis-dot--idle" />IDLE</>}
