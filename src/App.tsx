@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { startCapture, stopCapture } from "tauri-plugin-wasapi-api";
+import { startCapture, stopCapture } from "./wasapi-api";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
@@ -295,6 +295,7 @@ function App() {
 
   const systemAudioBufferRef = useRef<Float32Array>(new Float32Array(SYSTEM_FFT_SIZE));
   const systemAudioWriteRef = useRef(0);
+  const lastSpectrumUpdateRef = useRef(0);
 
   const toggleSystemAudioCapture = async () => {
     if (systemAudioEnabled) {
@@ -326,7 +327,13 @@ function App() {
               write = (write + 1) % ring.length;
             }
             systemAudioWriteRef.current = write;
-            systemSpectrumRef.current = calculateSystemSpectrum(ring, write);
+            // WASAPI can deliver chunks faster than the visualizer needs. Limit FFT
+            // work to ~30 Hz instead of recalculating the spectrum for every chunk.
+            const now = performance.now();
+            if (now - lastSpectrumUpdateRef.current >= 1000 / 30) {
+              systemSpectrumRef.current = calculateSystemSpectrum(ring, write);
+              lastSpectrumUpdateRef.current = now;
+            }
           } else if (event.event === "error") {
             setSystemAudioEnabled(false);
             systemSpectrumRef.current = [];
@@ -496,10 +503,19 @@ function App() {
       }
     }
 
+    // Reuse the analyser buffer instead of allocating a new Uint8Array every frame.
+    const frequencyData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
     let frame = 0;
+    let lastDrawTime = 0;
+    const FRAME_INTERVAL = 1000 / 30;
     const COUNT = 56;
 
-    const draw = () => {
+    const draw = (timestamp: number) => {
+      if (timestamp - lastDrawTime < FRAME_INTERVAL) {
+        frame = window.requestAnimationFrame(draw);
+        return;
+      }
+      lastDrawTime = timestamp;
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const width = Math.max(1, Math.floor(rect.width * dpr));
@@ -512,9 +528,10 @@ function App() {
 
       ctx.clearRect(0, 0, width, height);
 
-      const styleTarget = document.querySelector(".app") ?? canvas;
-      const accent = getComputedStyle(styleTarget).getPropertyValue("--accent").trim() || "#8b7cff";
-      const now = performance.now();
+      // The effect restarts when the current track accent changes, so this
+      // value does not need to be recomputed on every animation frame.
+      const accent = current.accent || "#8b7cff";
+      const now = timestamp;
 
       const systemBins = systemSpectrumRef.current;
       const hasSystemSpectrum = systemAudioEnabled && systemBins.length === COUNT;
@@ -526,11 +543,10 @@ function App() {
       let levels: number[];
       if (hasSystemSpectrum) {
         levels = systemBins;
-      } else if (isLocalActive && analyser) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        try { analyser.getByteFrequencyData(data); } catch { /* ignore */ }
+      } else if (isLocalActive && analyser && frequencyData) {
+        try { analyser.getByteFrequencyData(frequencyData); } catch { /* ignore */ }
         levels = Array.from({ length: COUNT }, (_, i) =>
-          (data[Math.min(data.length - 1, Math.floor(i * data.length / COUNT))] / 255)
+          (frequencyData[Math.min(frequencyData.length - 1, Math.floor(i * frequencyData.length / COUNT))] / 255)
         );
       } else if (isYouTubeActive) {
         // Good-looking fake spectrum shaped like real music
@@ -561,7 +577,7 @@ function App() {
 
     frame = window.requestAnimationFrame(draw);
     return () => window.cancelAnimationFrame(frame);
-  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url, showSettings, systemAudioEnabled]);
+  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url, current.accent, showSettings, systemAudioEnabled]);
 
   // Sync visMode to canvas via custom property (avoids stale closure)
   useEffect(() => {
