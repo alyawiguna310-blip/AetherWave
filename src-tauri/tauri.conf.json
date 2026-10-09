@@ -21,6 +21,11 @@
       "csp": null
     }
   },
+  "plugins": {
+    "wasapi": {
+      "permissions": ["wasapi:default"]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
