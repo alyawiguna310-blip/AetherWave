@@ -462,3 +462,42 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
   .wallpaper-toolbar { align-items:flex-start; flex-direction:column; }
   .wallpaper-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 }
+
+/* Wallpaper Engine desktop-apply additions */
+.wallpaper-static-preview {
+  display: block;
+  width: 100%;
+  max-height: 52vh;
+  object-fit: contain;
+  border-radius: 5px;
+  background: #111318;
+}
+.wallpaper-no-preview {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  padding: 24px;
+  border: 1px dashed #393e47;
+  border-radius: 5px;
+  color: #969da7;
+  background: #15171b;
+  text-align: center;
+}
+.wallpaper-apply-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.wallpaper-apply-row > span {
+  flex: 1 1 220px;
+  color: #858c97;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.wallpaper-apply-row .settings:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
