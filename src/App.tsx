@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
+type YouTubeVideo = {
+  id: { videoId: string };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    publishedAt: string;
+    description: string;
+    thumbnails?: { medium?: { url: string }; high?: { url: string }; default?: { url: string } };
+  };
+};
 
 const tracks: Track[] = [
   { title: "Midnight City", artist: "M83", album: "Hurry Up, We're Dreaming", duration: "4:03", accent: "#8b7cff" },
@@ -56,6 +67,10 @@ function App() {
   const [youtubeApiKey, setYoutubeApiKey] = useState("");
   const [spotifyClientId, setSpotifyClientId] = useState("");
   const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+  const [youtubeResults, setYoutubeResults] = useState<YouTubeVideo[]>([]);
+  const [searchedQuery, setSearchedQuery] = useState("");
+  const [youtubeLoading, setYoutubeLoading] = useState(false);
+  const [youtubeError, setYoutubeError] = useState("");
 
   useEffect(() => {
     try {
@@ -78,6 +93,55 @@ function App() {
       setMessage("Could not save integration settings");
     }
   };
+  const searchYouTube = async (query = searchQuery) => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      setYoutubeError("Type a song, artist, or topic to search.");
+      setYoutubeResults([]);
+      setSearchedQuery("");
+      return;
+    }
+    if (!youtubeApiKey.trim()) {
+      setYoutubeError("Add your YouTube Data API key in Preferences → Integrations first.");
+      setYoutubeResults([]);
+      setSearchedQuery(cleanQuery);
+      setMessage("YouTube API key required");
+      return;
+    }
+    setYoutubeLoading(true);
+    setYoutubeError("");
+    setSearchedQuery(cleanQuery);
+    setMessage("Searching YouTube…");
+    try {
+      const params = new URLSearchParams({ part: "snippet", type: "video", maxResults: "12", q: cleanQuery, key: youtubeApiKey.trim(), safeSearch: "moderate" });
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
+      const payload = await response.json() as { items?: YouTubeVideo[]; error?: { message?: string; errors?: Array<{ reason?: string }> } };
+      if (!response.ok) {
+        const reason = payload.error?.errors?.[0]?.reason;
+        if (response.status === 403 && reason === "quotaExceeded") throw new Error("YouTube API quota used up for today. Try again after the quota resets.");
+        if (response.status === 403) throw new Error("Google rejected this API request. Check that YouTube Data API v3 is enabled and your key restrictions allow this app.");
+        throw new Error(payload.error?.message || `YouTube request failed (${response.status}).`);
+      }
+      const items = (payload.items ?? []).filter((item) => item.id?.videoId);
+      setYoutubeResults(items);
+      setMessage(`Found ${items.length} YouTube results`);
+    } catch (error) {
+      setYoutubeResults([]);
+      setYoutubeError(error instanceof Error ? error.message : "Could not search YouTube. Check your internet connection and API key.");
+      setMessage("YouTube search failed");
+    } finally {
+      setYoutubeLoading(false);
+    }
+  };
+
+  const openYouTubeVideo = async (videoId: string) => {
+    try {
+      await openUrl(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`);
+    } catch {
+      setMessage("Could not open YouTube in your browser");
+    }
+  };
+
   const availableTracks = localTracks;
   const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
@@ -253,20 +317,29 @@ function App() {
               <p className="integration-help">Get it from the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify Developer Dashboard</a>. A desktop app should use OAuth PKCE; do not enter or store a Client Secret here.</p>
             </div>
             <div className="integration-actions"><button className="integration-save" disabled={!credentialsLoaded} onClick={saveIntegrations}>Save credentials</button><button className="settings" onClick={() => { setYoutubeApiKey(""); setSpotifyClientId(""); }}>Clear fields</button></div>
-            <p className="integration-footnote">This phase adds local credential fields only. YouTube search and Spotify OAuth still need to be connected in the next integration step.</p>
+            <p className="integration-footnote">YouTube search is connected to the key saved on this device. Spotify is paused for now. Restrict the API key in Google Cloud and never commit it to GitHub.</p>
           </section>}
           {!showSettings && active === "Search" && <section className="search-page">
             <div className="search-topline"><div><span className="kicker">DISCOVER SOMETHING NEW</span><h2>Search music</h2></div><span className="search-provider-label">{searchProvider === "Spotify" ? "SPOTIFY" : "YOUTUBE"}</span></div>
             <div className="search-workspace">
-              <div className="provider-switch" data-provider={searchProvider} role="group" aria-label="Search provider"><span className="provider-slider" aria-hidden="true" /><button className={searchProvider === "YouTube" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("YouTube")} aria-pressed={searchProvider === "YouTube"}><Icon name="youtube" size={16} /><span>YouTube</span></button><button className={searchProvider === "Spotify" ? "provider-option active" : "provider-option"} onClick={() => setSearchProvider("Spotify")} aria-pressed={searchProvider === "Spotify"}><Icon name="spotify" size={16} /><span>Spotify</span></button></div>
-              <label className="search-field"><Icon name="search" size={18} /><input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setMessage(searchProvider + " demo results for " + searchQuery); }} placeholder="What do you want to listen to?" /><kbd>ENTER</kbd>{searchQuery && <button className="clear-search" onClick={() => setSearchQuery("")} aria-label="Clear search">×</button>}</label>
+              <div className="provider-switch" data-provider="YouTube" role="group" aria-label="Search provider"><span className="provider-slider" aria-hidden="true" /><button className="provider-option active" onClick={() => setSearchProvider("YouTube")} aria-pressed={true}><Icon name="youtube" size={16} /><span>YouTube</span></button><button className="provider-option provider-disabled" onClick={() => { setSearchProvider("YouTube"); setMessage("Spotify is paused while we finish YouTube integration"); }} aria-pressed={false} title="Spotify integration is paused"><Icon name="spotify" size={16} /><span>Spotify · later</span></button></div>
+              <label className="search-field"><Icon name="search" size={18} /><input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void searchYouTube(); }} placeholder="Search songs, artists, or music…" /><button className="youtube-search-button" onClick={() => void searchYouTube()} disabled={youtubeLoading} aria-label="Search YouTube">{youtubeLoading ? "…" : "Search"}</button>{searchQuery && <button className="clear-search" onClick={() => { setSearchQuery(""); setSearchedQuery(""); setYoutubeResults([]); setYoutubeError(""); }} aria-label="Clear search">×</button>}</label>
             </div>
-            {!searchQuery.trim() ? <div className="browse-section"><div className="panel-heading"><div><span className="kicker">START EXPLORING</span><h3>Browse all</h3></div></div><div className="browse-grid">
-              {[{name:"Electronic",tone:"violet",hint:"Synths & late nights"},{name:"Chill",tone:"blue",hint:"Slow down a little"},{name:"Indie",tone:"rose",hint:"Find your next favorite"},{name:"Ambient",tone:"teal",hint:"Soundscapes to drift to"}].map((item) => <button key={item.name} className={"browse-card " + item.tone} onClick={() => setSearchQuery(item.name)}><span>{item.name}</span><small>{item.hint}</small><i><Icon name="music" size={26} /></i></button>)}
-            </div><p className="search-note">Preview layout with sample categories. Connect {searchProvider} to search its real catalog.</p></div> : <div className="search-results"><div className="panel-heading"><div><span className="kicker">TOP MATCHES</span><h3>Results for “{searchQuery}”</h3></div><span className="result-count">SAMPLE DATA</span></div>
-              {tracks.filter((item) => (item.title + " " + item.artist + " " + item.album).toLowerCase().includes(searchQuery.toLowerCase())).map((item) => <button className="search-result-row" key={item.title} onClick={() => setMessage(item.title + " · " + searchProvider + " playback needs API integration")}><span className="result-cover" style={{background:"linear-gradient(135deg, " + item.accent + ", #181a20)"}}><Icon name="music" size={22} /></span><span className="result-copy"><b>{item.title}</b><small>Song · {item.artist}</small></span><span className="result-album">{item.album}</span><span className="result-play"><Icon name="play" size={15} /></span></button>)}
-              {!tracks.some((item) => (item.title + " " + item.artist + " " + item.album).toLowerCase().includes(searchQuery.toLowerCase())) && <div className="search-no-results"><Icon name="search" size={22} /><b>No sample matches found</b><span>Real {searchProvider} results will appear after provider integration.</span></div>}
-              <p className="search-note">These are sample results for the UI only — no streaming or catalog search is connected yet.</p>
+            {!searchedQuery && !youtubeError ? <div className="browse-section"><div className="panel-heading"><div><span className="kicker">START EXPLORING</span><h3>Browse music</h3></div></div><div className="browse-grid">
+              {[{name:"Electronic",tone:"violet",hint:"Synths & late nights"},{name:"Chill",tone:"blue",hint:"Slow down a little"},{name:"Indie",tone:"rose",hint:"Find your next favorite"},{name:"Ambient",tone:"teal",hint:"Soundscapes to drift to"}].map((item) => <button key={item.name} className={"browse-card " + item.tone} onClick={() => { setSearchQuery(item.name); void searchYouTube(item.name); }}><span>{item.name}</span><small>{item.hint}</small><i><Icon name="music" size={26} /></i></button>)}
+            </div><p className="search-note">Searches real YouTube videos. Add your API key in Preferences if you haven’t already.</p></div> : <div className="search-results"><div className="panel-heading"><div><span className="kicker">YOUTUBE RESULTS</span><h3>{searchedQuery ? `Results for “${searchedQuery}”` : "Search YouTube"}</h3></div><span className="result-count">{youtubeLoading ? "SEARCHING…" : `${youtubeResults.length} VIDEOS`}</span></div>
+              {youtubeError && <div className="youtube-error" role="alert"><Icon name="search" size={18} /><span>{youtubeError}</span>{!youtubeApiKey.trim() && <button className="settings" onClick={() => setShowSettings(true)}>Open Preferences</button>}</div>}
+              {youtubeLoading && <div className="youtube-loading"><span className="youtube-spinner" /> Searching YouTube…</div>}
+              {!youtubeLoading && !youtubeError && youtubeResults.map((item) => {
+                const thumbnail = item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.high?.url ?? item.snippet.thumbnails?.default?.url;
+                return <button className="youtube-result-row" key={item.id.videoId} onClick={() => void openYouTubeVideo(item.id.videoId)} title="Open this video on YouTube">
+                  {thumbnail ? <img className="youtube-thumbnail" src={thumbnail} alt="" loading="lazy" /> : <span className="youtube-thumbnail youtube-thumbnail-fallback"><Icon name="youtube" size={22} /></span>}
+                  <span className="youtube-result-copy"><b>{item.snippet.title}</b><small>{item.snippet.channelTitle}</small><span>{item.snippet.description || "No description available."}</span></span>
+                  <span className="youtube-open"><Icon name="play" size={15} /></span>
+                </button>;
+              })}
+              {!youtubeLoading && !youtubeError && searchedQuery && !youtubeResults.length && <div className="search-no-results"><Icon name="search" size={22} /><b>No videos found</b><span>Try a different song title or artist.</span></div>}
+              <p className="search-note">Selecting a result opens YouTube in your browser. This first step searches the catalog; in-app playback is not connected yet.</p>
             </div>}
           </section>}
           {!showSettings && active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
