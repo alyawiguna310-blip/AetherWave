@@ -80,7 +80,7 @@ fn find_video(folder: &Path) -> Option<PathBuf> {
     let mut stack = vec![folder.to_path_buf()];
     let mut visited = 0usize;
     while let Some(dir) = stack.pop() {
-        if visited >= 1200 { break; }
+        if visited >= 80 { break; }
         visited += 1;
         let Ok(entries) = fs::read_dir(dir) else { continue };
         for entry in entries.flatten() {
