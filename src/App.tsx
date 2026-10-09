@@ -139,6 +139,7 @@ function App() {
 
   const playYouTubeVideo = (video: YouTubeVideo) => {
     setSelectedYouTubeVideo(video);
+    setShowYouTubeVideo(true);
     setYoutubeIsPlaying(true);
     setPlaying(true);
     setMessage(`Playing ${video.snippet.title}`);
