@@ -150,11 +150,56 @@ function App() {
     ? { title: selectedYouTubeVideo.snippet.title, artist: selectedYouTubeVideo.snippet.channelTitle, album: "YouTube", duration: "—", accent: "#ff7777" }
     : availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
 
-  useEffect(() => {
+  const sendYouTubeCommand = (func: string, args: unknown[] = []) => {
     const iframe = youtubeIframeRef.current;
-    if (!selectedYouTubeVideo || !iframe?.contentWindow) return;
-    iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com");
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "https://www.youtube-nocookie.com");
+  };
+
+  useEffect(() => {
+    if (!selectedYouTubeVideo) return;
+    sendYouTubeCommand(youtubeIsPlaying ? "playVideo" : "pauseVideo");
   }, [youtubeIsPlaying, selectedYouTubeVideo]);
+
+  // The footer controls are wired to YouTube's iframe API messages as well as local audio.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.volume = volume / 100;
+    if (selectedYouTubeVideo) sendYouTubeCommand("setVolume", [volume]);
+  }, [volume, selectedYouTubeVideo]);
+
+  useEffect(() => {
+    if (!selectedYouTubeVideo) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://www.youtube-nocookie.com" || typeof event.data !== "string") return;
+      try {
+        const payload = JSON.parse(event.data) as { event?: string; info?: { currentTime?: number; duration?: number; playerState?: number } };
+        if (payload.event !== "infoDelivery" || !payload.info) return;
+        const time = payload.info.currentTime;
+        const duration = payload.info.duration;
+        if (typeof time === "number" && Number.isFinite(time)) {
+          setCurrentTime(time);
+          if (typeof duration === "number" && duration > 0) setProgress(Math.min(100, (time / duration) * 100));
+        }
+        if (typeof payload.info.playerState === "number") {
+          const isPlaying = payload.info.playerState === 1;
+          setYoutubeIsPlaying(isPlaying);
+          setPlaying(isPlaying);
+        }
+      } catch {
+        // Ignore non-JSON iframe messages.
+      }
+    };
+    window.addEventListener("message", onMessage);
+    const requestTimer = window.setInterval(() => {
+      sendYouTubeCommand("getCurrentTime");
+      sendYouTubeCommand("getDuration");
+    }, 500);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      window.clearInterval(requestTimer);
+    };
+  }, [selectedYouTubeVideo]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -333,7 +378,7 @@ function App() {
           </section>}
           {selectedYouTubeVideo && <section className="youtube-player-panel persistent-youtube-player" aria-label="YouTube player">
             <div className="youtube-player-caption"><b title={selectedYouTubeVideo.snippet.title}>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => setShowYouTubeVideo((value) => !value)}>{showYouTubeVideo ? "Hide video" : "Show video"}</button><button className="settings" onClick={() => { setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setShowYouTubeVideo(false); setPlaying(false); setMessage("YouTube playback stopped"); }}>Close</button></div>
-            {showYouTubeVideo && <div className="youtube-player-frame"><iframe ref={youtubeIframeRef} key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={() => { const iframe = youtubeIframeRef.current; if (iframe?.contentWindow) iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com"); }} /></div>}
+            {showYouTubeVideo && <div className="youtube-player-frame"><iframe ref={youtubeIframeRef} key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={() => { const iframe = youtubeIframeRef.current; if (iframe?.contentWindow) { iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "aetherwave" }), "https://www.youtube-nocookie.com"); iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "addEventListener", args: ["onStateChange"] }), "https://www.youtube-nocookie.com"); iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [volume] }), "https://www.youtube-nocookie.com"); iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com"); } }} /></div>}
           </section>}
 
           {!showSettings && active === "Search" && <section className="search-page">
@@ -417,7 +462,7 @@ function App() {
         <div className="player-song">{selectedYouTubeVideo ? <img className="mini-cover thumbnail-cover" src={selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt="" /> : <div className="mini-cover" style={{ background: current.accent }}>A</div>}<div><b title={current.title}>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
           <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => { const nextPlaying = !playing; setPlaying(nextPlaying); if (selectedYouTubeVideo) setYoutubeIsPlaying(nextPlaying); }}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
-          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{current.duration}</span></div>
+          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (selectedYouTubeVideo) sendYouTubeCommand("seekTo", [Math.max(0, currentTime + ((value - progress) / 100) * 180), true]); else if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{selectedYouTubeVideo ? "YouTube" : current.duration}</span></div>
         </div>
         <div className="volume"><span className="volume-icon"><Icon name="volume" size={16} /></span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
       </footer>
