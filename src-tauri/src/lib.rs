@@ -1,6 +1,5 @@
 // Native Windows WASAPI loopback capture for a real system-audio spectrum.
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tauri::Emitter;
 
 static CAPTURE_RUNNING: AtomicBool = AtomicBool::new(false);
@@ -16,7 +15,10 @@ fn capture_system_audio(app: tauri::AppHandle) -> Result<(), String> {
     use rustfft::{num_complex::Complex, FftPlanner};
     use wasapi::*;
 
-    initialize_mta().map_err(|e| format!("COM initialization failed: {e}"))?;
+    let com_result = initialize_mta();
+    if com_result.is_err() {
+        return Err(format!("COM initialization failed: {com_result:?}"));
+    }
     let enumerator = DeviceEnumerator::new().map_err(|e| e.to_string())?;
     let device = enumerator.get_default_device(&Direction::Render).map_err(|e| e.to_string())?;
     let mut audio_client = device.get_iaudioclient().map_err(|e| e.to_string())?;
@@ -25,7 +27,7 @@ fn capture_system_audio(app: tauri::AppHandle) -> Result<(), String> {
     const CHANNELS: usize = 2;
     const BYTES_PER_FRAME: usize = 8;
 
-    let format = WaveFormat::new(32, 32, &SampleType::Float, sample_rate as u32, CHANNELS as u16, None);
+    let format = WaveFormat::new(32, 32, &SampleType::Float, sample_rate, CHANNELS, None);
     let (_, min_period) = audio_client.get_device_period().map_err(|e| e.to_string())?;
     let mode = StreamMode::EventsShared {
         autoconvert: true,
