@@ -71,6 +71,8 @@ function App() {
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [youtubeError, setYoutubeError] = useState("");
   const [selectedYouTubeVideo, setSelectedYouTubeVideo] = useState<YouTubeVideo | null>(null);
+  const [youtubeIsPlaying, setYoutubeIsPlaying] = useState(false);
+  const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     try {
@@ -136,11 +138,21 @@ function App() {
 
   const playYouTubeVideo = (video: YouTubeVideo) => {
     setSelectedYouTubeVideo(video);
+    setYoutubeIsPlaying(true);
+    setPlaying(true);
     setMessage(`Playing ${video.snippet.title}`);
   };
 
   const availableTracks = localTracks;
-  const current = availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
+  const current: Track = selectedYouTubeVideo
+    ? { title: selectedYouTubeVideo.snippet.title, artist: selectedYouTubeVideo.snippet.channelTitle, album: "YouTube", duration: "—", accent: "#ff7777" }
+    : availableTracks[Math.min(track, availableTracks.length - 1)] ?? tracks[0];
+
+  useEffect(() => {
+    const iframe = youtubeIframeRef.current;
+    if (!selectedYouTubeVideo || !iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com");
+  }, [youtubeIsPlaying, selectedYouTubeVideo]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -150,10 +162,10 @@ function App() {
   }, [current.url]);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || selectedYouTubeVideo) return;
     const timer = window.setInterval(() => setProgress((p) => p >= 100 ? 0 : p + 0.25), 1000);
     return () => window.clearInterval(timer);
-  }, [playing]);
+  }, [playing, selectedYouTubeVideo]);
 
   const spectrumCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -244,10 +256,10 @@ function App() {
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
-  const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
+  const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
   const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
-  const next = () => { if (availableTracks.length) selectTrack((track + 1) % availableTracks.length); };
-  const previous = () => { if (availableTracks.length) selectTrack((track - 1 + availableTracks.length) % availableTracks.length); };
+  const next = () => { if (selectedYouTubeVideo && youtubeResults.length) { const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId); playYouTubeVideo(youtubeResults[(index + 1 + youtubeResults.length) % youtubeResults.length]); return; } if (availableTracks.length) selectTrack((track + 1) % availableTracks.length); };
+  const previous = () => { if (selectedYouTubeVideo && youtubeResults.length) { const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId); playYouTubeVideo(youtubeResults[(index - 1 + youtubeResults.length) % youtubeResults.length]); return; } if (availableTracks.length) selectTrack((track - 1 + availableTracks.length) % availableTracks.length); };
 
   return (
     <div className="app" style={{ "--accent": current.accent } as React.CSSProperties}>
@@ -325,10 +337,6 @@ function App() {
             {!searchedQuery && !youtubeError ? <div className="browse-section"><div className="panel-heading"><div><span className="kicker">START EXPLORING</span><h3>Browse music</h3></div></div><div className="browse-grid">
               {[{name:"Electronic",tone:"violet",hint:"Synths & late nights"},{name:"Chill",tone:"blue",hint:"Slow down a little"},{name:"Indie",tone:"rose",hint:"Find your next favorite"},{name:"Ambient",tone:"teal",hint:"Soundscapes to drift to"}].map((item) => <button key={item.name} className={"browse-card " + item.tone} onClick={() => { setSearchQuery(item.name); void searchYouTube(item.name); }}><span>{item.name}</span><small>{item.hint}</small><i><Icon name="music" size={26} /></i></button>)}
             </div><p className="search-note">Searches real YouTube videos. Add your API key in Preferences if you haven’t already.</p></div> : <div className="search-results"><div className="panel-heading"><div><span className="kicker">YOUTUBE RESULTS</span><h3>{searchedQuery ? `Results for “${searchedQuery}”` : "Search YouTube"}</h3></div><span className="result-count">{youtubeLoading ? "SEARCHING…" : `${youtubeResults.length} VIDEOS`}</span></div>
-              {selectedYouTubeVideo && <section className="youtube-player-panel" aria-label="YouTube player">
-                <div className="youtube-player-frame"><iframe key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>
-                <div className="youtube-player-caption"><b>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => setSelectedYouTubeVideo(null)}>Close player</button></div>
-              </section>}
               {youtubeError && <div className="youtube-error" role="alert"><Icon name="search" size={18} /><span>{youtubeError}</span>{!youtubeApiKey.trim() && <button className="settings" onClick={() => setShowSettings(true)}>Open Preferences</button>}</div>}
               {youtubeLoading && <div className="youtube-loading"><span className="youtube-spinner" /> Searching YouTube…</div>}
               {!youtubeLoading && !youtubeError && youtubeResults.map((item) => {
@@ -343,6 +351,11 @@ function App() {
               <p className="search-note">Select a result to play it here. Some videos may not allow embedded playback due to their owner’s settings or regional restrictions.</p>
             </div>}
           </section>}
+          {selectedYouTubeVideo && <section className="youtube-player-panel persistent-youtube-player" aria-label="Persistent YouTube player">
+            <div className="youtube-player-frame"><iframe ref={youtubeIframeRef} key={selectedYouTubeVideo.id.videoId} src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(selectedYouTubeVideo.id.videoId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`} title={selectedYouTubeVideo.snippet.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen onLoad={() => { const iframe = youtubeIframeRef.current; if (iframe?.contentWindow) iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: youtubeIsPlaying ? "playVideo" : "pauseVideo", args: [] }), "https://www.youtube-nocookie.com"); }} /></div>
+            <div className="youtube-player-caption"><b>{selectedYouTubeVideo.snippet.title}</b><span>{selectedYouTubeVideo.snippet.channelTitle}</span><button className="settings" onClick={() => { setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setPlaying(false); setMessage("YouTube playback stopped"); }}>Close player</button></div>
+          </section>}
+
           {!showSettings && active === "Library" && !localTracks.length && <section className="download-empty"><div className="download-icon"><Icon name="download" size={22} /></div><div><span className="kicker">OFFLINE LIBRARY</span><h3>Download Music</h3><p>Local music files will appear here and remain available offline.</p></div></section>}
 
           {!showSettings && <div className="now-playing-layout">
