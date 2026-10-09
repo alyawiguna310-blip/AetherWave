@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { startCapture, stopCapture } from "tauri-plugin-wasapi-api";
 import "./App.css";
 
-type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
+type Track = { title: string; artist: string; album: string; duration: string; accent: string; path?: string; fileName?: string; durationSeconds?: number };
+type LocalAudioFile = { path: string; title: string };
+type PlaybackInfo = { path: string | null; playing: boolean; paused: boolean; position_secs: number; duration_secs: number | null; volume: number };
 type YouTubeVideo = {
   id: { videoId: string };
   snippet: {
@@ -129,8 +132,7 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [localTracks, setLocalTracks] = useState<Track[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [volume, setVolume] = useState(72);
   const [message, setMessage] = useState("Ready");
   const [showSettings, setShowSettings] = useState(false);
@@ -271,6 +273,7 @@ function App() {
   };
 
   const playYouTubeVideo = (video: YouTubeVideo) => {
+    void invoke("stop_audio").catch(() => undefined);
     setSelectedYouTubeVideo(video);
     setYoutubeDuration(0);
     setCurrentTime(0);
@@ -297,10 +300,11 @@ function App() {
     sendYouTubeCommand(youtubeIsPlaying ? "playVideo" : "pauseVideo");
   }, [youtubeIsPlaying, selectedYouTubeVideo]);
 
-  // The footer controls are wired to YouTube's iframe API messages as well as local audio.
+  // Keep native output and the embedded YouTube player on the same volume slider.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) audio.volume = volume / 100;
+    void invoke("set_volume", { volume: volume / 100 }).catch((error) => {
+      setMessage(error instanceof Error ? error.message : "Could not set local audio volume");
+    });
     if (selectedYouTubeVideo) sendYouTubeCommand("setVolume", [volume]);
   }, [volume, selectedYouTubeVideo]);
 
@@ -340,106 +344,70 @@ function App() {
   }, [selectedYouTubeVideo]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.src = current.url ?? "";
-      audioRef.current.load();
-    }
-  }, [current.url]);
-
-  useEffect(() => {
-    if (!playing || selectedYouTubeVideo) return;
-    const timer = window.setInterval(() => setProgress((p) => p >= 100 ? 0 : p + 0.25), 1000);
-    return () => window.clearInterval(timer);
-  }, [playing, selectedYouTubeVideo]);
+    if (selectedYouTubeVideo || !current.path) return;
+    let cancelled = false;
+    const pollPlayback = async () => {
+      try {
+        const info = await invoke<PlaybackInfo>("get_playback_state");
+        if (cancelled) return;
+        if (info.path === current.path) {
+          setPlaying(info.playing);
+          setCurrentTime(info.position_secs);
+          const duration = info.duration_secs ?? 0;
+          setProgress(duration > 0 ? Math.min(100, (info.position_secs / duration) * 100) : 0);
+          if (duration > 0) {
+            setLocalTracks((items) => items.map((item) =>
+              item.path === info.path && item.durationSeconds !== duration
+                ? { ...item, durationSeconds: duration, duration: formatTime(duration) }
+                : item
+            ));
+          }
+        } else if (!info.path) {
+          setPlaying(false);
+          setCurrentTime(0);
+          setProgress(0);
+        }
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "Could not read playback state");
+      }
+    };
+    void pollPlayback();
+    const timer = window.setInterval(() => void pollPlayback(), 350);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [selectedYouTubeVideo, current.path]);
 
   const spectrumCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing && current.url) {
-      void audioContextRef.current?.resume();
-      void audio.play().catch(() => setMessage("Could not play this local audio file"));
-    } else {
-      audio.pause();
-    }
-  }, [playing, current.url]);
 
   useEffect(() => {
     const canvas = spectrumCanvasRef.current;
     if (!canvas) return;
-
-    const audio = audioRef.current;
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    let analyser = analyserRef.current;
-
-    // The YouTube player is cross-origin, so use an animated approximation for it.
-    // Local files use Web Audio when the browser supports it; failure to create an
-    // analyser must never prevent the canvas visualizer from drawing.
-    if (audio && AudioContextClass && !analyserRef.current) {
-      try {
-        const context = audioContextRef.current ?? new AudioContextClass();
-        const source = sourceRef.current ?? context.createMediaElementSource(audio);
-        analyser = context.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.78;
-        source.connect(analyser);
-        analyser.connect(context.destination);
-        audioContextRef.current = context;
-        sourceRef.current = source;
-        analyserRef.current = analyser;
-      } catch (error) {
-        console.warn("AetherWave spectrum analyser unavailable; using visual fallback.", error);
-        analyser = null;
-      }
-    }
-
+    // Native local playback cannot be tapped by Web Audio; use Windows loopback
+    // for a real spectrum and an animated fallback when loopback is disabled.
     let frame = 0;
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const width = Math.max(1, Math.floor(rect.width * dpr));
       const height = Math.max(1, Math.floor(rect.height * dpr));
-
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-      }
-
+      if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
       const ctx = canvas.getContext("2d");
       if (ctx && rect.width > 0 && rect.height > 0) {
         ctx.clearRect(0, 0, width, height);
-        const data = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
-        if (analyser && data) {
-          try {
-            analyser.getByteFrequencyData(data);
-          } catch {
-            // Keep rendering the fallback bars if Web Audio becomes unavailable.
-          }
-        }
-
         const count = 56;
         const gap = Math.max(2 * dpr, width * 0.004);
         const barWidth = Math.max(1, (width - gap * (count - 1)) / count);
         const isYouTubeActive = Boolean(selectedYouTubeVideo && youtubeIsPlaying);
-        const isLocalActive = Boolean(!selectedYouTubeVideo && playing && audio && !audio.paused && audio.currentSrc);
+        const isLocalActive = Boolean(!selectedYouTubeVideo && playing && current.path);
         const systemBins = systemSpectrumRef.current;
         const hasSystemSpectrum = systemAudioEnabled && systemBins.length === count;
         const isActive = hasSystemSpectrum ? systemBins.some((value) => value > 0.025) : isYouTubeActive || isLocalActive;
         const styleTarget = document.querySelector(".app") ?? canvas;
         const accent = getComputedStyle(styleTarget).getPropertyValue("--accent").trim() || "#8b7cff";
         const now = performance.now();
-
         for (let i = 0; i < count; i++) {
-          const bin = data ? (data[Math.min(data.length - 1, Math.floor(i * data.length / count))] / 255) : 0;
           const idle = 0.025 + Math.abs(Math.sin(i * 0.43) * 0.045 + Math.sin(i * 0.16) * 0.025);
-          const pulse = 0.10
-            + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54
-            + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
-          const level = hasSystemSpectrum ? systemBins[i] : isYouTubeActive ? Math.min(1, pulse) : isLocalActive && data ? bin : idle;
+          const pulse = 0.10 + Math.abs(Math.sin(now / 190 + i * 0.43)) * 0.54 + Math.abs(Math.sin(now / 320 + i * 0.17)) * 0.22;
+          const level = hasSystemSpectrum ? systemBins[i] : (isYouTubeActive || isLocalActive) ? Math.min(1, pulse) : idle;
           const barHeight = Math.max(2 * dpr, level * height * 0.86);
           const x = i * (barWidth + gap);
           const y = (height - barHeight) / 2;
@@ -452,20 +420,94 @@ function App() {
         }
         ctx.globalAlpha = 1;
       }
-
       frame = window.requestAnimationFrame(draw);
     };
-
     frame = window.requestAnimationFrame(draw);
     return () => window.cancelAnimationFrame(frame);
-  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.url, showSettings, systemAudioEnabled]);
+  }, [selectedYouTubeVideo, youtubeIsPlaying, playing, current.path, showSettings, systemAudioEnabled]);
 
   const formatTime = (seconds: number) => { if (!Number.isFinite(seconds) || seconds < 0) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60).toString().padStart(2, "0"); return `${mins}:${secs}`; };
 
-  const selectTrack = (index: number) => { const list = availableTracks.length ? availableTracks : tracks; setSelectedYouTubeVideo(null); setYoutubeIsPlaying(false); setTrack(index); setProgress(0); setCurrentTime(0); setPlaying(true); setMessage(`Playing ${list[index]?.title ?? "track"}`); };
-  const importMusic = (files: FileList | null) => { if (!files?.length) return; const imported = Array.from(files).filter((file) => file.type.startsWith("audio/") || /\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i.test(file.name)).map((file) => ({ title: file.name.replace(/\.[^.]+$/, ""), artist: "Local file", album: "Downloaded Music", duration: "0:00", accent: "#8b7cff", url: URL.createObjectURL(file), fileName: file.name })); if (!imported.length) return; setLocalTracks(imported); setTrack(0); setProgress(0); setCurrentTime(0); setPlaying(false); setActive("Library"); setMessage(`${imported.length} downloaded track${imported.length === 1 ? "" : "s"} loaded`); };
-  const next = () => { if (selectedYouTubeVideo && youtubeResults.length) { const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId); playYouTubeVideo(youtubeResults[(index + 1 + youtubeResults.length) % youtubeResults.length]); return; } if (availableTracks.length) selectTrack((track + 1) % availableTracks.length); };
-  const previous = () => { if (selectedYouTubeVideo && youtubeResults.length) { const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId); playYouTubeVideo(youtubeResults[(index - 1 + youtubeResults.length) % youtubeResults.length]); return; } if (availableTracks.length) selectTrack((track - 1 + availableTracks.length) % availableTracks.length); };
+  const selectTrack = (index: number) => {
+    const selected = availableTracks[index];
+    if (!selected?.path) { setMessage("Add a local audio file before playing."); return; }
+    setSelectedYouTubeVideo(null);
+    setYoutubeIsPlaying(false);
+    setTrack(index);
+    setProgress(0);
+    setCurrentTime(0);
+    setMessage(`Loading ${selected.title}`);
+    void invoke<PlaybackInfo>("play_local", { path: selected.path })
+      .then((info) => { setPlaying(info.playing); setMessage(`Playing ${selected.title}`); })
+      .catch((error) => { setPlaying(false); setMessage(error instanceof Error ? error.message : "Could not play this local audio file"); });
+  };
+
+  const importMusic = async () => {
+    try {
+      const files = await invoke<LocalAudioFile[]>("pick_audio_files");
+      if (!files.length) return;
+      await invoke("stop_audio").catch(() => undefined);
+      setSelectedYouTubeVideo(null);
+      setYoutubeIsPlaying(false);
+      const imported: Track[] = files.map((file) => ({
+        title: file.title, artist: "Local file", album: "Local library", duration: "—",
+        accent: "#8b7cff", path: file.path, fileName: file.path.split(/[\\/]/).pop() ?? file.title,
+      }));
+      setLocalTracks(imported);
+      setTrack(0);
+      setProgress(0);
+      setCurrentTime(0);
+      setPlaying(false);
+      setActive("Library");
+      setMessage(`${imported.length} local track${imported.length === 1 ? "" : "s"} added`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not open the audio file picker");
+    }
+  };
+
+  const togglePlayback = async () => {
+    if (selectedYouTubeVideo) {
+      const nextPlaying = !youtubeIsPlaying;
+      setYoutubeIsPlaying(nextPlaying);
+      setPlaying(nextPlaying);
+      return;
+    }
+    if (!current.path) { setMessage("Add a local audio file to start playback."); return; }
+    try {
+      const info = await invoke<PlaybackInfo>("get_playback_state");
+      if (info.path !== current.path || (!info.playing && !info.paused)) {
+        const nextInfo = await invoke<PlaybackInfo>("play_local", { path: current.path });
+        setPlaying(nextInfo.playing);
+      } else if (info.playing) {
+        await invoke("pause_audio");
+        setPlaying(false);
+      } else {
+        await invoke("resume_audio");
+        setPlaying(true);
+      }
+    } catch (error) {
+      setPlaying(false);
+      setMessage(error instanceof Error ? error.message : "Playback command failed");
+    }
+  };
+
+  const next = () => {
+    if (selectedYouTubeVideo && youtubeResults.length) {
+      const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId);
+      playYouTubeVideo(youtubeResults[(index + 1 + youtubeResults.length) % youtubeResults.length]);
+      return;
+    }
+    if (availableTracks.length) selectTrack((track + 1) % availableTracks.length);
+  };
+
+  const previous = () => {
+    if (selectedYouTubeVideo && youtubeResults.length) {
+      const index = youtubeResults.findIndex((item) => item.id.videoId === selectedYouTubeVideo.id.videoId);
+      playYouTubeVideo(youtubeResults[(index - 1 + youtubeResults.length) % youtubeResults.length]);
+      return;
+    }
+    if (availableTracks.length) selectTrack((track - 1 + availableTracks.length) % availableTracks.length);
+  };
 
   return (
     <div className="app" style={{ "--accent": current.accent } as React.CSSProperties}>
@@ -507,10 +549,10 @@ function App() {
         </aside>
 
         <main className="content">
-          <input ref={fileInputRef} className="file-picker" type="file" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.opus" multiple onChange={(e) => importMusic(e.target.files)} />
+
           <div className="page-heading">
             <div><span className="kicker">MUSIC PLAYER</span><h1>{showSettings ? "Integrations" : active === "Home" ? "Home" : active}</h1></div>
-            <div className="heading-actions"><button className="download-button" onClick={() => fileInputRef.current?.click()}><Icon name="download" size={14} /><span>Download Music</span></button><button className="settings" onClick={() => setShowSettings((value) => !value)}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
+            <div className="heading-actions"><button className="download-button" onClick={() => void importMusic()}><Icon name="download" size={14} /><span>Add Music</span></button><button className="settings" onClick={() => setShowSettings((value) => !value)}><Icon name="settings" size={15} /><span>Preferences</span></button></div>
           </div>
 
           {showSettings && <section className="integrations-page">
@@ -573,9 +615,9 @@ function App() {
               <span className="kicker">NOW PLAYING</span>
               <h2 title={current.title}>{current.title}</h2>
               <p>{current.artist} <span>·</span> {current.album}</p>
-              <div className="format-line"><span>{current.url ? "LOCAL" : "DEMO"}</span><span>{current.url ? "FILE" : "24 bit"}</span><span>{current.url ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : "44.1 kHz"}</span></div>
+              <div className="format-line"><span>{current.path ? "LOCAL" : "DEMO"}</span><span>{current.path ? "FILE" : "24 bit"}</span><span>{current.path ? (current.fileName?.split(".").pop()?.toUpperCase() || "AUDIO") : "44.1 kHz"}</span></div>
               <div className="action-row">
-                <button className="play-button" onClick={() => { const nextPlaying = !playing; setPlaying(nextPlaying); if (selectedYouTubeVideo) setYoutubeIsPlaying(nextPlaying); }}><><Icon name={playing ? "pause" : "play"} size={15} /><span>{playing ? "Pause" : "Play"}</span></></button>
+                <button className="play-button" onClick={() => void togglePlayback()}><><Icon name={playing ? "pause" : "play"} size={15} /><span>{playing ? "Pause" : "Play"}</span></></button>
                 <button className="small-button" onClick={previous} aria-label="Previous track"><Icon name="prev" /></button>
                 <button className="small-button" onClick={next} aria-label="Next track"><Icon name="next" /></button>
               </div>
@@ -616,11 +658,10 @@ function App() {
       </div>
 
       <footer className="player">
-        <audio ref={audioRef} preload="metadata" onLoadedMetadata={(e) => { const duration = e.currentTarget.duration; setLocalTracks((items) => items.map((item, i) => i === track ? { ...item, duration: formatTime(duration) } : item)); }} onTimeUpdate={(e) => { const time = e.currentTarget.currentTime; const duration = e.currentTarget.duration; setCurrentTime(time); setProgress(duration ? (time / duration) * 100 : 0); }} onEnded={next} />
         <div className="player-song">{selectedYouTubeVideo ? <img className="mini-cover thumbnail-cover" src={selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt="" /> : <div className="mini-cover" style={{ background: current.accent }}>A</div>}<div><b title={current.title}>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
-          <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => { const nextPlaying = !playing; setPlaying(nextPlaying); if (selectedYouTubeVideo) setYoutubeIsPlaying(nextPlaying); }}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
-          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (selectedYouTubeVideo) sendYouTubeCommand("seekTo", [youtubeDuration > 0 ? (value / 100) * youtubeDuration : currentTime, true]); else if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{selectedYouTubeVideo ? formatTime(youtubeDuration) : current.duration}</span></div>
+          <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => void togglePlayback()}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
+          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (selectedYouTubeVideo) sendYouTubeCommand("seekTo", [youtubeDuration > 0 ? (value / 100) * youtubeDuration : currentTime, true]); else if (current.path && current.durationSeconds) void invoke("seek_audio", { positionSecs: (value / 100) * current.durationSeconds }).catch((error) => setMessage(error instanceof Error ? error.message : "Could not seek in this track")); }} /><span>{selectedYouTubeVideo ? formatTime(youtubeDuration) : current.duration}</span></div>
         </div>
         <div className="volume"><span className="volume-icon"><Icon name="volume" size={16} /></span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
       </footer>
