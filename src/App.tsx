@@ -72,6 +72,7 @@ function App() {
   const [youtubeError, setYoutubeError] = useState("");
   const [selectedYouTubeVideo, setSelectedYouTubeVideo] = useState<YouTubeVideo | null>(null);
   const [youtubeIsPlaying, setYoutubeIsPlaying] = useState(false);
+  const [youtubeDuration, setYoutubeDuration] = useState(0);
   const [showYouTubeVideo, setShowYouTubeVideo] = useState(false);
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -139,6 +140,9 @@ function App() {
 
   const playYouTubeVideo = (video: YouTubeVideo) => {
     setSelectedYouTubeVideo(video);
+    setYoutubeDuration(0);
+    setCurrentTime(0);
+    setProgress(0);
     setShowYouTubeVideo(true);
     setYoutubeIsPlaying(true);
     setPlaying(true);
@@ -177,9 +181,11 @@ function App() {
         if (payload.event !== "infoDelivery" || !payload.info) return;
         const time = payload.info.currentTime;
         const duration = payload.info.duration;
+        if (typeof duration === "number" && Number.isFinite(duration) && duration > 0) setYoutubeDuration(duration);
         if (typeof time === "number" && Number.isFinite(time)) {
           setCurrentTime(time);
-          if (typeof duration === "number" && duration > 0) setProgress(Math.min(100, (time / duration) * 100));
+          const total = typeof duration === "number" && duration > 0 ? duration : youtubeDuration;
+          if (total > 0) setProgress(Math.min(100, (time / total) * 100));
         }
         if (typeof payload.info.playerState === "number") {
           const isPlaying = payload.info.playerState === 1;
@@ -462,7 +468,7 @@ function App() {
         <div className="player-song">{selectedYouTubeVideo ? <img className="mini-cover thumbnail-cover" src={selectedYouTubeVideo.snippet.thumbnails?.medium?.url ?? selectedYouTubeVideo.snippet.thumbnails?.default?.url} alt="" /> : <div className="mini-cover" style={{ background: current.accent }}>A</div>}<div><b title={current.title}>{current.title}</b><small>{current.artist}</small></div></div>
         <div className="transport">
           <div className="transport-buttons"><button onClick={previous} aria-label="Previous track"><Icon name="prev" size={18} /></button><button className="main-play" onClick={() => { const nextPlaying = !playing; setPlaying(nextPlaying); if (selectedYouTubeVideo) setYoutubeIsPlaying(nextPlaying); }}><Icon name={playing ? "pause" : "play"} size={18} /></button><button onClick={next} aria-label="Next track"><Icon name="next" size={18} /></button></div>
-          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (selectedYouTubeVideo) sendYouTubeCommand("seekTo", [Math.max(0, currentTime + ((value - progress) / 100) * 180), true]); else if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{selectedYouTubeVideo ? "YouTube" : current.duration}</span></div>
+          <div className="timeline"><span>{formatTime(currentTime)}</span><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); if (selectedYouTubeVideo) sendYouTubeCommand("seekTo", [youtubeDuration > 0 ? (value / 100) * youtubeDuration : currentTime, true]); else if (audioRef.current?.duration) audioRef.current.currentTime = (value / 100) * audioRef.current.duration; }} /><span>{selectedYouTubeVideo ? formatTime(youtubeDuration) : current.duration}</span></div>
         </div>
         <div className="volume"><span className="volume-icon"><Icon name="volume" size={16} /></span><input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} /><span>{volume}</span></div>
       </footer>
