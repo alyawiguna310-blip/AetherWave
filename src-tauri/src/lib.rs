@@ -261,7 +261,8 @@ pub fn run() {
             get_playback_state,
             system_audio::start_system_audio,
             system_audio::stop_system_audio,
-            wallpaper_engine::scan_wallpaper_engine_library
+            wallpaper_engine::scan_wallpaper_engine_library,
+            wallpaper_engine::apply_wallpaper_engine_wallpaper
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
