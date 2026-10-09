@@ -1,4 +1,5 @@
 mod system_audio;
+mod wallpaper_engine;
 
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use serde::Serialize;
@@ -259,7 +260,10 @@ pub fn run() {
             seek_audio,
             get_playback_state,
             system_audio::start_system_audio,
-            system_audio::stop_system_audio
+            system_audio::stop_system_audio,
+            wallpaper_engine::scan_wallpaper_engine_library,
+            wallpaper_engine::get_wallpaper_engine_status,
+            wallpaper_engine::load_wallpaper_thumbnail
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
