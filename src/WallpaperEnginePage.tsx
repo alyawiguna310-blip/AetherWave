@@ -6,6 +6,7 @@ export type WallpaperItem = {
   title: string;
   kind: string;
   preview_path: string | null;
+  image_path: string | null;
   video_path: string | null;
   has_audio_hint: boolean;
   audio_note: string;
@@ -109,8 +110,10 @@ export default function WallpaperEnginePage({ onUseAsBackground }: WallpaperEngi
             </div>
             {selected.video_path
               ? <video key={selected.id} src={convertFileSrc(selected.video_path)} muted autoPlay loop playsInline controls={false} />
-              : thumbnailById[selected.id]
-                ? <img className="wallpaper-static-preview" src={thumbnailById[selected.id]} alt={selected.title} />
+              : selected.image_path
+                ? <img className="wallpaper-static-preview" src={convertFileSrc(selected.image_path)} alt={selected.title} />
+                : thumbnailById[selected.id]
+                  ? <img className="wallpaper-static-preview" src={thumbnailById[selected.id]} alt={selected.title} />
                 : <div className="wallpaper-no-preview">No in-app preview available for this {selected.kind} wallpaper.</div>}
             <p>{selected.audio_note} Videos and static previews can be rendered inside AetherWave. Wallpaper Engine scene, web, and application projects need their own compatible renderer and may only show a preview image here.</p>
             <div className="wallpaper-apply-row">
