@@ -114,18 +114,30 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    let unlistenSpectrum: (() => void) | undefined;
+    let unlistenError: (() => void) | undefined;
     void listen<number[]>("system-audio-spectrum", (event) => {
       systemSpectrumRef.current = event.payload;
     }).then((stopListening) => {
       if (cancelled) stopListening();
-      else unlisten = stopListening;
+      else unlistenSpectrum = stopListening;
     }).catch(() => {
       // Browser preview does not expose Tauri's native system-audio events.
     });
+    void listen<string>("system-audio-error", (event) => {
+      setSystemAudioEnabled(false);
+      systemSpectrumRef.current = [];
+      setMessage(`System audio capture failed: ${event.payload}`);
+    }).then((stopListening) => {
+      if (cancelled) stopListening();
+      else unlistenError = stopListening;
+    }).catch(() => {
+      // Native capture errors are only emitted by the Windows desktop app.
+    });
     return () => {
       cancelled = true;
-      unlisten?.();
+      unlistenSpectrum?.();
+      unlistenError?.();
     };
   }, []);
 
