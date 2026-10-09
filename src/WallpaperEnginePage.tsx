@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
-type WallpaperItem = {
+export type WallpaperItem = {
   id: string;
   title: string;
   kind: string;
@@ -12,7 +12,11 @@ type WallpaperItem = {
   folder_path: string;
 };
 
-export default function WallpaperEnginePage() {
+type WallpaperEnginePageProps = {
+  onUseAsBackground: (item: WallpaperItem, thumbnailDataUrl: string | null) => void;
+};
+
+export default function WallpaperEnginePage({ onUseAsBackground }: WallpaperEnginePageProps) {
   const [items, setItems] = useState<WallpaperItem[]>([]);
   const [thumbnailById, setThumbnailById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -20,7 +24,6 @@ export default function WallpaperEnginePage() {
   const [status, setStatus] = useState("");
   const [silentOnly, setSilentOnly] = useState(true);
   const [selected, setSelected] = useState<WallpaperItem | null>(null);
-  const [applying, setApplying] = useState(false);
 
   const scan = useCallback(async () => {
     setLoading(true);
@@ -54,21 +57,6 @@ export default function WallpaperEnginePage() {
     [items, silentOnly],
   );
 
-  const applySelected = async () => {
-    if (!selected || applying) return;
-    setApplying(true);
-    setError("");
-    setStatus("");
-    try {
-      const result = await invoke<string>("apply_wallpaper_engine_wallpaper", { id: selected.id });
-      setStatus(result);
-    } catch (e) {
-      setError(typeof e === "string" ? e : "Could not send the wallpaper command.");
-    } finally {
-      setApplying(false);
-    }
-  };
-
   const closePreview = () => setSelected(null);
 
   return (
@@ -77,7 +65,7 @@ export default function WallpaperEnginePage() {
         <div>
           <span className="kicker">STEAM WORKSHOP · 431960</span>
           <h2>Wallpaper Engine</h2>
-          <p>Browse installed Workshop wallpapers and send an apply command to Wallpaper Engine. Your Workshop files are read-only.</p>
+          <p>Browse your installed Workshop wallpapers and use supported images or videos as AetherWave’s own background. Your Windows desktop wallpaper will not be changed.</p>
         </div>
         <button className="settings" onClick={() => void scan()} disabled={loading}>{loading ? "Scanning…" : "Rescan libraries"}</button>
       </div>
@@ -124,12 +112,12 @@ export default function WallpaperEnginePage() {
               : thumbnailById[selected.id]
                 ? <img className="wallpaper-static-preview" src={thumbnailById[selected.id]} alt={selected.title} />
                 : <div className="wallpaper-no-preview">No in-app preview available for this {selected.kind} wallpaper.</div>}
-            <p>{selected.audio_note}. The audio-metadata filter is heuristic; applying a wallpaper uses Wallpaper Engine's own renderer.</p>
+            <p>{selected.audio_note} Videos and static previews can be rendered inside AetherWave. Wallpaper Engine scene, web, and application projects need their own compatible renderer and may only show a preview image here.</p>
             <div className="wallpaper-apply-row">
-              <button className="settings" onClick={() => void applySelected()} disabled={applying}>
-                {applying ? "Sending command…" : "Apply to desktop"}
+              <button className="settings" onClick={() => { onUseAsBackground(selected, thumbnailById[selected.id] ?? null); setStatus(`Using “${selected.title}” as the AetherWave background.`); }}>
+                Use as AetherWave background
               </button>
-              <span>Wallpaper Engine should already be running. Check the Windows desktop to confirm the change.</span>
+              <span>This changes only the background inside this app, never the Windows desktop.</span>
             </div>
           </section>
         </div>
