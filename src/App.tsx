@@ -300,9 +300,9 @@ function App() {
               <div className="spectrum-label">{playing ? "audio reactive" : "play a track to start the visualizer"}</div>
             </div>
           </section>
-          </div>
+          </div>}
 
-          <section className="queue">
+          {!showSettings && <section className="queue">
             <div className="panel-heading">
               <div><span className="kicker">PLAYBACK QUEUE</span><h3>Up next</h3></div>
               <button className="clear-button" onClick={() => setMessage("Queue cleared — demo mode")}>Clear</button>
