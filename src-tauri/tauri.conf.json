@@ -22,7 +22,6 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$HOME/**",
           "C:/Program Files (x86)/Steam/steamapps/workshop/content/431960/**",
           "C:/SteamLibrary/steamapps/workshop/content/431960/**",
           "D:/SteamLibrary/steamapps/workshop/content/431960/**",
