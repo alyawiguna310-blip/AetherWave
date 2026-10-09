@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { startCapture, stopCapture } from "./wasapi-api";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   BAR_COUNT,
   LevelSmoother,
@@ -13,7 +14,7 @@ import {
   idleLevels,
 } from "./lib/visualizer";
 import "./App.css";
-import WallpaperEnginePage from "./WallpaperEnginePage";
+import WallpaperEnginePage, { type WallpaperItem } from "./WallpaperEnginePage";
 
 type Track = { title: string; artist: string; album: string; duration: string; accent: string; url?: string; fileName?: string };
 type YouTubeVideo = {
@@ -98,6 +99,7 @@ function App() {
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(false);
   const systemSpectrumRef = useRef<number[]>([]);
   const [visMode, setVisMode] = useState<VisMode>("bars");
+  const [appBackground, setAppBackground] = useState<{ id: string; title: string; video_path: string | null; image_url: string | null } | null>(null);
   // Kept in refs so smoothing state survives the render-loop effect restarting.
   const smootherRef = useRef(new LevelSmoother());
   const simulatedRef = useRef(new SimulatedSpectrum());
@@ -461,6 +463,14 @@ function App() {
 
   return (
     <div className="app" style={{ "--accent": current.accent } as React.CSSProperties}>
+      <div className="app-wallpaper-background" aria-hidden="true">
+        {appBackground?.video_path
+          ? <video key={appBackground.id} src={convertFileSrc(appBackground.video_path)} autoPlay muted loop playsInline />
+          : appBackground?.image_url
+            ? <img src={appBackground.image_url} alt="" />
+            : null}
+        {appBackground && <div className="app-wallpaper-shade" />}
+      </div>
       <header className="titlebar">
         <div className="app-name"><span className="app-symbol">A</span><span>AetherWave</span></div>
         <div className="titlebar-center">{active}</div>
@@ -609,7 +619,14 @@ function App() {
             )}
           </section>}
 
-          {!showSettings && active === "Wallpaper" && <WallpaperEnginePage />}
+          {!showSettings && active === "Wallpaper" && <WallpaperEnginePage onUseAsBackground={(item: WallpaperItem, thumbnailDataUrl: string | null) => {
+            setAppBackground({
+              id: item.id,
+              title: item.title,
+              video_path: item.kind === "video" ? item.video_path : null,
+              image_url: item.kind === "video" && item.video_path ? null : thumbnailDataUrl,
+            });
+          }} />}
 
           {!showSettings && active === "Library" && !localTracks.length && (
             <section className="download-empty">
