@@ -115,7 +115,7 @@ export default function WallpaperEnginePage({ onUseAsBackground }: WallpaperEngi
                 : thumbnailById[selected.id]
                   ? <img className="wallpaper-static-preview" src={thumbnailById[selected.id]} alt={selected.title} />
                 : <div className="wallpaper-no-preview">No in-app preview available for this {selected.kind} wallpaper.</div>}
-            <p>{selected.audio_note} Videos and static previews can be rendered inside AetherWave. Wallpaper Engine scene, web, and application projects need their own compatible renderer and may only show a preview image here.</p>
+            <p>{selected.audio_note} Videos and static images can be rendered inside AetherWave. Wallpaper Engine scene, web, and application projects need their own compatible renderer and may only show a preview image here.</p>
             <div className="wallpaper-apply-row">
               <button className="settings" onClick={() => { onUseAsBackground(selected, thumbnailById[selected.id] ?? null); setStatus(`Using “${selected.title}” as the AetherWave background.`); }}>
                 Use as AetherWave background
