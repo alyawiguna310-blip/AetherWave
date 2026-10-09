@@ -342,8 +342,9 @@ input[type="range"] { height: 3px; accent-color: var(--accent); cursor: pointer;
 .now-playing-layout .spectrum {
   flex: 1;
   min-height: 145px;
-  border: 1px solid #30343a;
-  border-radius: 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .now-playing-layout .spectrum-canvas {
   position: absolute;
