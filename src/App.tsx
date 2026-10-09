@@ -185,6 +185,8 @@ function App() {
     systemSpectrumRef.current = [];
     smoothedSpectrumRef.current.fill(0);
     peakSpectrumRef.current.fill(0);
+    // Update the UI before awaiting native IPC so a stalled WASAPI startup is visible.
+    setMessage("Starting Windows system-audio capture…");
     try {
       await startCapture(
         { sessionId: "system-audio", loopback: true, sampleRate: 16000, channels: 1 },
@@ -220,7 +222,10 @@ function App() {
       setMessage("Listening to Windows system audio for the spectrum");
     } catch (error) {
       setSystemAudioEnabled(false);
-      setMessage(error instanceof Error ? `System audio capture failed: ${error.message}` : "System audio capture requires the installed Windows app");
+      systemSpectrumRef.current = [];
+      const details = error instanceof Error ? error.message : String(error);
+      console.error("[AetherWave] WASAPI startup failed:", error);
+      setMessage(`System audio capture failed: ${details}`);
     }
   };
 
